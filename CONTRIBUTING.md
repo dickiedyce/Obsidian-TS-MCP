@@ -6,7 +6,7 @@ started and what to expect.
 ## Development setup
 
 ```sh
-git clone https://github.com/dd/obsidian-ts-mcp.git
+git clone https://github.com/dickiedyce/obsidian-ts-mcp.git
 cd obsidian-ts-mcp
 npm install
 npm run build

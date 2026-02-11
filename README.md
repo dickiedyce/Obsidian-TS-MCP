@@ -18,7 +18,7 @@ The `obsidian` binary must be available on your `PATH`.
 ## Installation
 
 ```sh
-git clone https://github.com/dd/obsidian-ts-mcp.git
+git clone https://github.com/dickiedyce/obsidian-ts-mcp.git
 cd obsidian-ts-mcp
 npm install
 npm run build

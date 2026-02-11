@@ -34,12 +34,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dd/obsidian-ts-mcp.git"
+    "url": "https://github.com/dickiedyce/obsidian-ts-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/dd/obsidian-ts-mcp/issues"
+    "url": "https://github.com/dickiedyce/obsidian-ts-mcp/issues"
   },
-  "homepage": "https://github.com/dd/obsidian-ts-mcp#readme",
+  "homepage": "https://github.com/dickiedyce/obsidian-ts-mcp#readme",
   "engines": {
     "node": ">=18"
   },
