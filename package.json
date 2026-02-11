@@ -1,6 +1,6 @@
 {
   "name": "obsidian-ts-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server wrapping the official Obsidian CLI for VS Code agent integration",
   "type": "module",
   "main": "dist/server.js",

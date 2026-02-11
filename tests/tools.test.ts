@@ -18,11 +18,21 @@ const EXPECTED_TOOL_NAMES = [
   "read_property",
   "list_tasks",
   "toggle_task",
+  "daily_read",
+  "daily_prepend",
+  "list_templates",
+  "read_template",
+  "get_links",
+  "list_properties",
+  "remove_property",
+  "get_tag_info",
+  "move_file",
+  "query_base",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 16 tools", () => {
-    expect(tools).toHaveLength(16);
+  it("exports exactly 26 tools", () => {
+    expect(tools).toHaveLength(26);
   });
 
   it("has all expected tool names", () => {
@@ -184,6 +194,60 @@ describe("specific schemas", () => {
 
   it("get_tags sort enum has name and count", () => {
     const props = byName("get_tags").inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+    expect(props.sort.enum).toEqual(["name", "count"]);
+  });
+
+  // ── New tool schema checks ──────────────────────────────────────────
+
+  it("daily_read has no required fields", () => {
+    const schema = byName("daily_read").inputSchema as { required?: string[] };
+    expect(schema.required).toBeUndefined();
+  });
+
+  it("daily_prepend requires 'content'", () => {
+    const schema = byName("daily_prepend").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("content");
+  });
+
+  it("read_template requires 'name'", () => {
+    const schema = byName("read_template").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("name");
+  });
+
+  it("remove_property requires 'name'", () => {
+    const schema = byName("remove_property").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("name");
+  });
+
+  it("get_tag_info requires 'tag'", () => {
+    const schema = byName("get_tag_info").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("tag");
+  });
+
+  it("move_file requires 'from' and 'to'", () => {
+    const schema = byName("move_file").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("from");
+    expect(schema.required).toContain("to");
+  });
+
+  it("query_base requires 'base'", () => {
+    const schema = byName("query_base").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("base");
+  });
+
+  it("query_base format enum has json, csv, tsv, md, paths", () => {
+    const props = byName("query_base").inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+    expect(props.format.enum).toEqual(["json", "csv", "tsv", "md", "paths"]);
+  });
+
+  it("list_properties sort enum has name and count", () => {
+    const props = byName("list_properties").inputSchema.properties as Record<
       string,
       { enum?: string[] }
     >;

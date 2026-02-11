@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-02-11
+
+### Added
+
+- 10 new tools: `daily_read`, `daily_prepend`, `list_templates`,
+  `read_template`, `get_links`, `list_properties`, `remove_property`,
+  `get_tag_info`, `move_file`, `query_base`.
+- Server now exposes 26 tools (up from 16).
+- Tests expanded to 238 (up from 171).
+
+### Changed
+
+- Updated README with documentation for all 26 tools.
+
 ## [0.1.0] - 2026-02-11
 
 ### Added

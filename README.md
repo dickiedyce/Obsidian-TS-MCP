@@ -82,7 +82,7 @@ must match exactly what Obsidian shows in the vault switcher.
 
 ## Available tools
 
-The server exposes 16 tools organised into four groups.
+The server exposes 26 tools organised into nine groups.
 
 ### Core -- note management
 
@@ -120,19 +120,64 @@ The server exposes 16 tools organised into four groups.
 | `list_tasks`  | List tasks, with filters for status, file, or daily note. |
 | `toggle_task` | Toggle a task checkbox on or off.                         |
 
+### Daily notes (extended)
+
+| Tool            | Description                                              |
+| --------------- | -------------------------------------------------------- |
+| `daily_read`    | Read the contents of today's daily note.                 |
+| `daily_prepend` | Prepend content after the frontmatter of the daily note. |
+
+### Templates
+
+| Tool             | Description                                           |
+| ---------------- | ----------------------------------------------------- |
+| `list_templates` | List all available templates in the vault.            |
+| `read_template`  | Read the contents of a template, optionally resolved. |
+
+### Links
+
+| Tool        | Description                          |
+| ----------- | ------------------------------------ |
+| `get_links` | List all outgoing links from a note. |
+
+### Properties (extended)
+
+| Tool              | Description                                            |
+| ----------------- | ------------------------------------------------------ |
+| `list_properties` | List all frontmatter properties used across the vault. |
+| `remove_property` | Remove a frontmatter property from a note.             |
+
+### Tags (extended)
+
+| Tool           | Description                                           |
+| -------------- | ----------------------------------------------------- |
+| `get_tag_info` | Get detailed info about a specific tag and its files. |
+
+### File management
+
+| Tool        | Description                                             |
+| ----------- | ------------------------------------------------------- |
+| `move_file` | Move or rename a file; Obsidian updates internal links. |
+
+### Bases
+
+| Tool         | Description                                           |
+| ------------ | ----------------------------------------------------- |
+| `query_base` | Query an Obsidian Base and return structured results. |
+
 ## Project structure
 
 ```
 src/
   cli.ts          -- Low-level Obsidian CLI wrapper (exec, arg building, errors).
   tools.ts        -- MCP tool definitions (names, descriptions, JSON schemas).
-  handlers.ts     -- Dispatches tool calls to the appropriate CLI commands.
+  handlers.ts     -- Dispatches tool calls (26 tools) to CLI commands.
   server.ts       -- MCP server entry-point (stdio transport, error handling).
   validation.ts   -- Input validation against tool schemas.
 tests/
   cli.test.ts           -- Unit tests for argument building and error types.
   runObsidian.test.ts   -- Tests for CLI execution, timeouts, vault targeting.
-  handlers.test.ts      -- Tests for all 16 tool handlers (CLI is mocked).
+  handlers.test.ts      -- Tests for all 26 tool handlers (CLI is mocked).
   tools.test.ts         -- Schema validation for every tool definition.
   validation.test.ts    -- Input validation tests (types, enums, required fields).
   server.test.ts        -- Server factory, error formatting, version checks.
@@ -155,7 +200,7 @@ npm start             # Start the MCP server on stdio
 
 1. An MCP client (VS Code, Claude Desktop, etc.) launches the server over
    stdio.
-2. The client calls `tools/list` and receives the 16 tool definitions from
+2. The client calls `tools/list` and receives the 26 tool definitions from
    `src/tools.ts`.
 3. When the client invokes a tool, `src/server.ts` routes the call to
    `handleTool()` in `src/handlers.ts`.

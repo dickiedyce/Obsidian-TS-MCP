@@ -350,6 +350,164 @@ describe("toggle_task", () => {
 
 // ── Error handling ──────────────────────────────────────────────────────
 
+// ── Daily Notes (extended) ──────────────────────────────────────────────
+
+describe("daily_read", () => {
+  it("calls daily:read with no extra params", async () => {
+    await handleTool("daily_read", {});
+    const args = calledWith();
+    expect(args).toEqual(["daily:read"]);
+  });
+});
+
+describe("daily_prepend", () => {
+  it("passes content with silent flag", async () => {
+    await handleTool("daily_prepend", { content: "Standup summary" });
+    const args = calledWith();
+    expect(args[0]).toBe("daily:prepend");
+    expect(args).toContain("content=Standup summary");
+    expect(args).toContain("silent");
+  });
+});
+
+// ── Templates ───────────────────────────────────────────────────────────
+
+describe("list_templates", () => {
+  it("calls templates with no extra params", async () => {
+    await handleTool("list_templates", {});
+    const args = calledWith();
+    expect(args).toEqual(["templates"]);
+  });
+
+  it("passes total flag", async () => {
+    await handleTool("list_templates", { total: true });
+    const args = calledWith();
+    expect(args).toContain("total");
+  });
+});
+
+describe("read_template", () => {
+  it("passes name param", async () => {
+    await handleTool("read_template", { name: "Session Note" });
+    const args = calledWith();
+    expect(args[0]).toBe("template:read");
+    expect(args).toContain("name=Session Note");
+  });
+
+  it("passes resolve flag", async () => {
+    await handleTool("read_template", { name: "ADR", resolve: true });
+    const args = calledWith();
+    expect(args).toContain("resolve");
+  });
+});
+
+// ── Links ───────────────────────────────────────────────────────────────
+
+describe("get_links", () => {
+  it("passes file param", async () => {
+    await handleTool("get_links", { file: "Index" });
+    const args = calledWith();
+    expect(args).toEqual(["links", "file=Index"]);
+  });
+
+  it("passes path param", async () => {
+    await handleTool("get_links", { path: "notes/Index.md" });
+    const args = calledWith();
+    expect(args).toEqual(["links", "path=notes/Index.md"]);
+  });
+});
+
+// ── Properties (extended) ───────────────────────────────────────────────
+
+describe("list_properties", () => {
+  it("calls properties with counts flag always set", async () => {
+    await handleTool("list_properties", {});
+    const args = calledWith();
+    expect(args[0]).toBe("properties");
+    expect(args).toContain("counts");
+  });
+
+  it("passes file and sort params", async () => {
+    await handleTool("list_properties", { file: "ADR-001", sort: "count" });
+    const args = calledWith();
+    expect(args).toContain("file=ADR-001");
+    expect(args).toContain("sort=count");
+  });
+});
+
+describe("remove_property", () => {
+  it("passes name and file", async () => {
+    await handleTool("remove_property", { name: "deprecated", file: "ADR-001" });
+    const args = calledWith();
+    expect(args[0]).toBe("property:remove");
+    expect(args).toContain("name=deprecated");
+    expect(args).toContain("file=ADR-001");
+  });
+
+  it("passes path instead of file", async () => {
+    await handleTool("remove_property", { name: "old", path: "notes/task.md" });
+    const args = calledWith();
+    expect(args).toContain("path=notes/task.md");
+  });
+});
+
+// ── Tags (extended) ─────────────────────────────────────────────────────
+
+describe("get_tag_info", () => {
+  it("passes tag param", async () => {
+    await handleTool("get_tag_info", { tag: "debug" });
+    const args = calledWith();
+    expect(args[0]).toBe("tag");
+    expect(args).toContain("tag=debug");
+  });
+
+  it("passes verbose flag", async () => {
+    await handleTool("get_tag_info", { tag: "adr", verbose: true });
+    const args = calledWith();
+    expect(args).toContain("verbose");
+  });
+});
+
+// ── File Management ─────────────────────────────────────────────────────
+
+describe("move_file", () => {
+  it("passes from and to with silent flag", async () => {
+    await handleTool("move_file", { from: "ADR-001.md", to: "archive/ADR-001.md" });
+    const args = calledWith();
+    expect(args[0]).toBe("move");
+    expect(args).toContain("from=ADR-001.md");
+    expect(args).toContain("to=archive/ADR-001.md");
+    expect(args).toContain("silent");
+  });
+});
+
+// ── Bases ───────────────────────────────────────────────────────────────
+
+describe("query_base", () => {
+  it("passes base with default json format", async () => {
+    await handleTool("query_base", { base: "ADRs" });
+    const args = calledWith();
+    expect(args[0]).toBe("base:query");
+    expect(args).toContain("base=ADRs");
+    expect(args).toContain("format=json");
+  });
+
+  it("allows overriding format", async () => {
+    await handleTool("query_base", { base: "ADRs", format: "md" });
+    const args = calledWith();
+    expect(args).toContain("format=md");
+  });
+
+  it("passes view and limit", async () => {
+    await handleTool("query_base", { base: "Reviews", view: "Open", limit: 10 });
+    const args = calledWith();
+    expect(args).toContain("view=Open");
+    expect(args).toContain("limit=10");
+  });
+});
+
+// ── Error handling ──────────────────────────────────────────────────────
+
 describe("unknown tool", () => {
   it("throws for an unknown tool name", async () => {
     await expect(handleTool("nonexistent_tool", {})).rejects.toThrow(

@@ -16,7 +16,7 @@ describe("server constants", () => {
   });
 
   it("reads version from package.json", () => {
-    expect(SERVER_VERSION).toBe("0.1.0");
+    expect(SERVER_VERSION).toBe("0.2.0");
     expect(typeof SERVER_VERSION).toBe("string");
     // Verify it looks like a semver string
     expect(SERVER_VERSION).toMatch(/^\d+\.\d+\.\d+/);

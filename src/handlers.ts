@@ -179,6 +179,100 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         }),
       );
 
+    // ── Daily Notes (extended) ────────────────────────────────────────
+
+    case "daily_read":
+      return runObsidian(buildArgs("daily:read", {}));
+
+    case "daily_prepend":
+      return runObsidian(
+        buildArgs("daily:prepend", {
+          content: input.content as string,
+          silent: true,
+        }),
+      );
+
+    // ── Templates ─────────────────────────────────────────────────────
+
+    case "list_templates":
+      return runObsidian(
+        buildArgs("templates", {
+          total: input.total as boolean | undefined,
+        }),
+      );
+
+    case "read_template":
+      return runObsidian(
+        buildArgs("template:read", {
+          name: input.name as string,
+          resolve: input.resolve as boolean | undefined,
+        }),
+      );
+
+    // ── Links ─────────────────────────────────────────────────────────
+
+    case "get_links":
+      return runObsidian(
+        buildArgs("links", {
+          file: input.file as string | undefined,
+          path: input.path as string | undefined,
+        }),
+      );
+
+    // ── Properties (extended) ─────────────────────────────────────────
+
+    case "list_properties":
+      return runObsidian(
+        buildArgs("properties", {
+          file: input.file as string | undefined,
+          path: input.path as string | undefined,
+          sort: input.sort as string | undefined,
+          counts: true,
+        }),
+      );
+
+    case "remove_property":
+      return runObsidian(
+        buildArgs("property:remove", {
+          name: input.name as string,
+          file: input.file as string | undefined,
+          path: input.path as string | undefined,
+        }),
+      );
+
+    // ── Tags (extended) ───────────────────────────────────────────────
+
+    case "get_tag_info":
+      return runObsidian(
+        buildArgs("tag", {
+          tag: input.tag as string,
+          verbose: input.verbose as boolean | undefined,
+        }),
+      );
+
+    // ── File Management ───────────────────────────────────────────────
+
+    case "move_file":
+      return runObsidian(
+        buildArgs("move", {
+          from: input.from as string,
+          to: input.to as string,
+          silent: true,
+        }),
+      );
+
+    // ── Bases ─────────────────────────────────────────────────────────
+
+    case "query_base":
+      return runObsidian(
+        buildArgs("base:query", {
+          base: input.base as string,
+          view: input.view as string | undefined,
+          format: (input.format as string | undefined) ?? "json",
+          limit: input.limit as number | undefined,
+        }),
+      );
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

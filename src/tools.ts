@@ -31,13 +31,18 @@ function objectSchema(
 
 /**
  * Complete list of MCP tools exposed by this server.
- * There are 16 tools organised into four groups:
+ * There are 26 tools organised into nine groups:
  *
  *  1. Core -- note creation, reading, appending, prepending, searching,
  *     and daily-note management.
  *  2. Discovery -- vault info, file listing, tags, backlinks, outlines.
- *  3. Properties -- reading and setting frontmatter metadata.
+ *  3. Properties -- reading, setting, and removing frontmatter metadata.
  *  4. Tasks -- listing and toggling task checkboxes.
+ *  5. Daily Notes (extended) -- reading and prepending to the daily note.
+ *  6. Templates -- listing and reading vault templates.
+ *  7. Links -- outgoing link discovery.
+ *  8. Tags (extended) -- detailed tag information.
+ *  9. File Management, Bases -- moving files and querying structured views.
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -388,5 +393,206 @@ export const tools: Tool[] = [
         description: "Line number of the task",
       },
     }),
+  },
+
+  // ── Daily Notes (extended) ──────────────────────────────────────────
+
+  {
+    name: "daily_read",
+    description:
+      "Read the contents of today's daily note. Returns the full markdown content " +
+      "including frontmatter. Creates the daily note if it doesn't exist.",
+    inputSchema: objectSchema({}),
+  },
+
+  {
+    name: "daily_prepend",
+    description:
+      "Prepend content after the frontmatter of today's daily note. Useful for " +
+      "adding standup summaries or status updates at the top of the daily note.",
+    inputSchema: objectSchema(
+      {
+        content: {
+          type: "string",
+          description: "Content to prepend. Use \\n for newlines.",
+        },
+      },
+      ["content"],
+    ),
+  },
+
+  // ── Templates ─────────────────────────────────────────────────────────
+
+  {
+    name: "list_templates",
+    description:
+      "List all available templates in the vault. Returns template names that can " +
+      "be used with create_note's template parameter.",
+    inputSchema: objectSchema({
+      total: {
+        type: "boolean",
+        description: "Return only the template count instead of the list",
+      },
+    }),
+  },
+
+  {
+    name: "read_template",
+    description:
+      "Read the contents of a template. Optionally resolves template variables " +
+      "like {{date}}, {{time}}, and {{title}}.",
+    inputSchema: objectSchema(
+      {
+        name: {
+          type: "string",
+          description: "Template name (without path or extension)",
+        },
+        resolve: {
+          type: "boolean",
+          description: "Resolve template variables ({{date}}, {{time}}, {{title}})",
+        },
+      },
+      ["name"],
+    ),
+  },
+
+  // ── Links ─────────────────────────────────────────────────────────────
+
+  {
+    name: "get_links",
+    description:
+      "List all outgoing links from a note. Returns the files that the given note " +
+      "links to. The complement of get_backlinks.",
+    inputSchema: objectSchema({
+      file: {
+        type: "string",
+        description: "Note name to find outgoing links for",
+      },
+      path: {
+        type: "string",
+        description: "Exact path from vault root",
+      },
+    }),
+  },
+
+  // ── Properties (extended) ─────────────────────────────────────────────
+
+  {
+    name: "list_properties",
+    description:
+      "List all frontmatter properties used across the vault, or on a specific note. " +
+      "Returns property names with occurrence counts.",
+    inputSchema: objectSchema({
+      file: {
+        type: "string",
+        description: "Note name to list properties for (omit for vault-wide)",
+      },
+      path: {
+        type: "string",
+        description: "Exact path from vault root",
+      },
+      sort: {
+        type: "string",
+        enum: ["name", "count"],
+        description: "Sort order (default: name)",
+      },
+    }),
+  },
+
+  {
+    name: "remove_property",
+    description: "Remove a frontmatter property from a note.",
+    inputSchema: objectSchema(
+      {
+        name: {
+          type: "string",
+          description: "Property name to remove",
+        },
+        file: {
+          type: "string",
+          description: "Note name",
+        },
+        path: {
+          type: "string",
+          description: "Exact path from vault root",
+        },
+      },
+      ["name"],
+    ),
+  },
+
+  // ── Tags (extended) ───────────────────────────────────────────────────
+
+  {
+    name: "get_tag_info",
+    description:
+      "Get detailed information about a specific tag, including occurrence count " +
+      "and the list of files that use it.",
+    inputSchema: objectSchema(
+      {
+        tag: {
+          type: "string",
+          description: "Tag name (with or without # prefix)",
+        },
+        verbose: {
+          type: "boolean",
+          description: "Include the list of files using this tag",
+        },
+      },
+      ["tag"],
+    ),
+  },
+
+  // ── File Management ───────────────────────────────────────────────────
+
+  {
+    name: "move_file",
+    description:
+      "Move or rename a file in the vault. Obsidian will automatically update " +
+      "all internal links to the moved file.",
+    inputSchema: objectSchema(
+      {
+        from: {
+          type: "string",
+          description: "Current file path from vault root",
+        },
+        to: {
+          type: "string",
+          description: "New file path from vault root",
+        },
+      },
+      ["from", "to"],
+    ),
+  },
+
+  // ── Bases ─────────────────────────────────────────────────────────────
+
+  {
+    name: "query_base",
+    description:
+      "Query an Obsidian Base and return structured results. Bases provide " +
+      "database-like views of notes filtered by tags, properties, and folders.",
+    inputSchema: objectSchema(
+      {
+        base: {
+          type: "string",
+          description: "Base file name or path (e.g. 'ADRs' or 'Bases/ADRs.base')",
+        },
+        view: {
+          type: "string",
+          description: "View name within the base (uses first view if omitted)",
+        },
+        format: {
+          type: "string",
+          enum: ["json", "csv", "tsv", "md", "paths"],
+          description: "Output format (default: json)",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of results",
+        },
+      },
+      ["base"],
+    ),
   },
 ];
