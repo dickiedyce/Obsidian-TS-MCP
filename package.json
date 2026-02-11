@@ -1,0 +1,60 @@
+{
+  "name": "obsidian-ts-mcp",
+  "version": "0.1.0",
+  "description": "MCP server wrapping the official Obsidian CLI for VS Code agent integration",
+  "type": "module",
+  "main": "dist/server.js",
+  "bin": {
+    "obsidian-ts-mcp": "dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint 'src/**/*.ts' 'tests/**/*.ts'",
+    "lint:fix": "eslint --fix 'src/**/*.ts' 'tests/**/*.ts'",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts' '*.json' '*.md'",
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts' '*.json' '*.md'",
+    "prepublishOnly": "npm run lint && npm run build && npm test"
+  },
+  "keywords": [
+    "obsidian",
+    "mcp",
+    "cli",
+    "vscode"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dd/obsidian-ts-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dd/obsidian-ts-mcp/issues"
+  },
+  "homepage": "https://github.com/dd/obsidian-ts-mcp#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "~1.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^4.0.18"
+  }
+}
