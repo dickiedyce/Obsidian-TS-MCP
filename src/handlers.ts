@@ -296,6 +296,50 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         }),
       );
 
+    case "backlog_done": {
+      const project = input.project as string;
+      const item = input.item as string;
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      // Read current backlog content
+      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+
+      // Find the first unchecked line containing the item substring
+      const lines = content.split("\n");
+      let found = false;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith("- [ ] ") && lines[i].includes(item)) {
+          const now = new Date();
+          const yy = String(now.getFullYear()).slice(2);
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          const dd = String(now.getDate()).padStart(2, "0");
+          const hh = String(now.getHours()).padStart(2, "0");
+          const min = String(now.getMinutes()).padStart(2, "0");
+          const stamp = `${yy}-${mm}-${dd} ${hh}:${min}`;
+          lines[i] = lines[i].replace("- [ ] ", "- [x] ") + ` @done (${stamp})`;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        throw new Error(
+          `No unchecked backlog item matching "${item}" in ${backlogPath}`,
+        );
+      }
+
+      // Write back using create with overwrite
+      await runObsidian(
+        buildArgs("create", {
+          name: backlogPath.replace(/\.md$/, ""),
+          content: lines.join("\n"),
+          overwrite: true,
+          silent: true,
+        }),
+      );
+      return `Marked done: ${item}`;
+    }
+
     case "project_list": {
       const listing = await runObsidian(
         buildArgs("files", { folder: "Projects", ext: "md" }),

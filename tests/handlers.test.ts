@@ -562,6 +562,64 @@ describe("backlog_read", () => {
   });
 });
 
+describe("backlog_done", () => {
+  it("marks the first matching unchecked item as done", async () => {
+    const backlogContent =
+      "# Backlog -- Acme\n- [ ] Fix login bug\n- [ ] Write docs\n";
+    // First call reads the backlog, second call writes it back
+    mockRun
+      .mockResolvedValueOnce(backlogContent)
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_done", {
+      project: "Acme",
+      item: "Fix login bug",
+    });
+
+    expect(mockRun).toHaveBeenCalledTimes(2);
+
+    // First call: read the backlog
+    const readArgs = mockRun.mock.calls[0][0] as string[];
+    expect(readArgs[0]).toBe("read");
+    expect(readArgs).toContain("path=Projects/Acme/backlog.md");
+
+    // Second call: overwrite with updated content
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    expect(writeArgs[0]).toBe("create");
+    expect(writeArgs).toContain("name=Projects/Acme/backlog");
+    expect(writeArgs).toContain("overwrite");
+    expect(writeArgs).toContain("silent");
+
+    const content = writeArgs.find((a) => a.startsWith("content="));
+    expect(content).toBeDefined();
+    expect(content).toMatch(/- \[x\] Fix login bug @done \(\d{2}-\d{2}-\d{2} \d{2}:\d{2}\)/);
+    // The other item should remain unchecked
+    expect(content).toContain("- [ ] Write docs");
+
+    expect(result).toBe("Marked done: Fix login bug");
+  });
+
+  it("throws when no matching unchecked item is found", async () => {
+    mockRun.mockResolvedValueOnce("# Backlog -- Acme\n- [x] Fix login bug\n");
+    await expect(
+      handleTool("backlog_done", { project: "Acme", item: "Fix login bug" }),
+    ).rejects.toThrow(/No unchecked backlog item matching/);
+  });
+
+  it("matches by substring", async () => {
+    const backlogContent = "# Backlog\n- [ ] Upgrade dependencies @high\n";
+    mockRun
+      .mockResolvedValueOnce(backlogContent)
+      .mockResolvedValueOnce("ok");
+
+    await handleTool("backlog_done", { project: "Acme", item: "Upgrade" });
+
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="));
+    expect(content).toMatch(/- \[x\] Upgrade dependencies @high @done/);
+  });
+});
+
 describe("project_list", () => {
   it("lists files in Projects folder and extracts unique project names", async () => {
     mockRun.mockResolvedValue(

@@ -46,7 +46,7 @@ function objectSchema(
  * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (31 tools).
+ * Complete list of MCP tools exposed by this server (32 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -642,6 +642,29 @@ export const tools: Tool[] = [
         },
       },
       ["project"],
+    ),
+  },
+
+  {
+    name: "backlog_done",
+    description:
+      "Mark a backlog item as done. Finds the first unchecked item whose text " +
+      "contains the given substring and checks it off with a @done timestamp. " +
+      "The item is changed from '- [ ] item' to '- [x] item @done (YY-MM-DD HH:mm)'.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (used as folder name under Projects/)",
+        },
+        item: {
+          type: "string",
+          description:
+            "Substring to match against unchecked backlog items. " +
+            "The first matching '- [ ]' line is marked as done.",
+        },
+      },
+      ["project", "item"],
     ),
   },
 
