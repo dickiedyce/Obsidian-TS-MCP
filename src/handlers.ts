@@ -273,7 +273,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         }),
       );
 
-    // ── Project Backlog ───────────────────────────────────────────────
+    // ── Project Management ─────────────────────────────────────────────
 
     case "backlog_add": {
       const project = input.project as string;
@@ -295,6 +295,69 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
           path: `Projects/${input.project as string}/backlog.md`,
         }),
       );
+
+    case "project_list": {
+      const listing = await runObsidian(
+        buildArgs("files", { folder: "Projects", ext: "md" }),
+      );
+      // Extract unique project folder names from "Projects/<name>/..."
+      const projects = [
+        ...new Set(
+          listing
+            .split("\n")
+            .map((line) => line.replace(/^Projects\//, "").split("/")[0])
+            .filter(Boolean),
+        ),
+      ];
+      return projects.join("\n");
+    }
+
+    case "project_overview":
+      return runObsidian(
+        buildArgs("read", {
+          path: `Projects/${input.project as string}/overview.md`,
+        }),
+      );
+
+    case "project_create": {
+      const project = input.project as string;
+      const description = input.description as string;
+      const repo = input.repo as string | undefined;
+      const tech = input.tech as string | undefined;
+
+      // Build overview frontmatter
+      const fmLines = [
+        "---",
+        `project: ${project}`,
+        "status: active",
+      ];
+      if (repo) fmLines.push(`repo: ${repo}`);
+      if (tech) {
+        fmLines.push("tech:");
+        for (const t of tech.split(",").map((s) => s.trim()).filter(Boolean)) {
+          fmLines.push(`  - ${t}`);
+        }
+      }
+      fmLines.push("tags:", "  - project-overview", "---");
+      const overviewContent = `${fmLines.join("\n")}\n\n# ${project}\n\n${description}\n`;
+
+      // Create overview and backlog
+      await runObsidian(
+        buildArgs("create", {
+          name: `Projects/${project}/overview`,
+          content: overviewContent,
+          silent: true,
+        }),
+      );
+      await runObsidian(
+        buildArgs("create", {
+          name: `Projects/${project}/backlog`,
+          content: `# Backlog -- ${project}\n`,
+          silent: true,
+        }),
+      );
+      return `Created project: ${project}`;
+    }
 
     default:
       throw new Error(`Unknown tool: ${name}`);

@@ -43,10 +43,10 @@ function objectSchema(
  *  7. Links -- outgoing link discovery.
  *  8. Tags (extended) -- detailed tag information.
  *  9. File Management, Bases -- moving files and querying structured views.
- * 10. Project Backlog -- per-project backlog management.
+ * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (28 tools).
+ * Complete list of MCP tools exposed by this server (31 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -600,7 +600,7 @@ export const tools: Tool[] = [
     ),
   },
 
-  // ── Project Backlog ───────────────────────────────────────────────────
+  // ── Project Management ────────────────────────────────────────────────
 
   {
     name: "backlog_add",
@@ -642,6 +642,59 @@ export const tools: Tool[] = [
         },
       },
       ["project"],
+    ),
+  },
+
+  {
+    name: "project_list",
+    description:
+      "List all projects in the vault. Returns the folder names under Projects/.",
+    inputSchema: objectSchema({}),
+  },
+
+  {
+    name: "project_overview",
+    description:
+      "Read a project's overview. Returns the contents of " +
+      "'Projects/<project>/overview.md', which contains project metadata " +
+      "such as description, repo URL, status, and tech stack.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (used as folder name under Projects/)",
+        },
+      },
+      ["project"],
+    ),
+  },
+
+  {
+    name: "project_create",
+    description:
+      "Create a new project. Sets up 'Projects/<project>/overview.md' with " +
+      "metadata frontmatter and 'Projects/<project>/backlog.md' with a heading. " +
+      "Use this when starting work on a project for the first time.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (becomes the folder name under Projects/)",
+        },
+        description: {
+          type: "string",
+          description: "One-line project description",
+        },
+        repo: {
+          type: "string",
+          description: "Repository URL (e.g. https://github.com/user/repo)",
+        },
+        tech: {
+          type: "string",
+          description: "Comma-separated tech stack (e.g. 'TypeScript, React, Vitest')",
+        },
+      },
+      ["project", "description"],
     ),
   },
 ];

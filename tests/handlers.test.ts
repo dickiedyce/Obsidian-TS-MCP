@@ -561,3 +561,61 @@ describe("backlog_read", () => {
     expect(args).toContain("path=Projects/Acme/backlog.md");
   });
 });
+
+describe("project_list", () => {
+  it("lists files in Projects folder and extracts unique project names", async () => {
+    mockRun.mockResolvedValue(
+      "Projects/Acme/backlog.md\nProjects/Acme/overview.md\nProjects/Beta/backlog.md",
+    );
+    const result = await handleTool("project_list", {});
+    expect(mockRun).toHaveBeenCalledOnce();
+    const args = mockRun.mock.calls[0][0] as string[];
+    expect(args[0]).toBe("files");
+    expect(args).toContain("folder=Projects");
+    expect(args).toContain("ext=md");
+    expect(result).toBe("Acme\nBeta");
+  });
+});
+
+describe("project_overview", () => {
+  it("reads the project overview file", async () => {
+    await handleTool("project_overview", { project: "Acme" });
+    const args = calledWith();
+    expect(args[0]).toBe("read");
+    expect(args).toContain("path=Projects/Acme/overview.md");
+  });
+});
+
+describe("project_create", () => {
+  it("creates overview and backlog files", async () => {
+    const result = await handleTool("project_create", {
+      project: "NewApp",
+      description: "A shiny new app",
+    });
+    expect(mockRun).toHaveBeenCalledTimes(2);
+    const overviewArgs = mockRun.mock.calls[0][0] as string[];
+    expect(overviewArgs[0]).toBe("create");
+    expect(overviewArgs).toContain("name=Projects/NewApp/overview");
+    expect(overviewArgs).toContain("silent");
+    const backlogArgs = mockRun.mock.calls[1][0] as string[];
+    expect(backlogArgs[0]).toBe("create");
+    expect(backlogArgs).toContain("name=Projects/NewApp/backlog");
+    expect(backlogArgs).toContain("silent");
+    expect(result).toBe("Created project: NewApp");
+  });
+
+  it("includes repo and tech in overview content", async () => {
+    await handleTool("project_create", {
+      project: "WebApp",
+      description: "A web application",
+      repo: "https://github.com/dd/WebApp",
+      tech: "TypeScript, React",
+    });
+    const overviewArgs = mockRun.mock.calls[0][0] as string[];
+    const content = overviewArgs.find((a) => a.startsWith("content="));
+    expect(content).toBeDefined();
+    expect(content).toContain("repo: https://github.com/dd/WebApp");
+    expect(content).toContain("- TypeScript");
+    expect(content).toContain("- React");
+  });
+});

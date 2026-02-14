@@ -30,11 +30,14 @@ const EXPECTED_TOOL_NAMES = [
   "query_base",
   "backlog_add",
   "backlog_read",
+  "project_list",
+  "project_overview",
+  "project_create",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 28 tools", () => {
-    expect(tools).toHaveLength(28);
+  it("exports exactly 31 tools", () => {
+    expect(tools).toHaveLength(31);
   });
 
   it("has all expected tool names", () => {
@@ -275,5 +278,21 @@ describe("specific schemas", () => {
   it("backlog_read requires 'project'", () => {
     const schema = byName("backlog_read").inputSchema as { required?: string[] };
     expect(schema.required).toContain("project");
+  });
+
+  it("project_list has no required fields", () => {
+    const schema = byName("project_list").inputSchema as { required?: string[] };
+    expect(schema.required).toBeUndefined();
+  });
+
+  it("project_overview requires 'project'", () => {
+    const schema = byName("project_overview").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+  });
+
+  it("project_create requires 'project' and 'description'", () => {
+    const schema = byName("project_create").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+    expect(schema.required).toContain("description");
   });
 });
