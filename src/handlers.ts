@@ -273,6 +273,29 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         }),
       );
 
+    // ── Project Backlog ───────────────────────────────────────────────
+
+    case "backlog_add": {
+      const project = input.project as string;
+      const item = input.item as string;
+      const priority = input.priority as string | undefined;
+      const line = priority ? `- [ ] ${item} @${priority}` : `- [ ] ${item}`;
+      return runObsidian(
+        buildArgs("append", {
+          path: `Projects/${project}/backlog.md`,
+          content: line,
+          silent: true,
+        }),
+      );
+    }
+
+    case "backlog_read":
+      return runObsidian(
+        buildArgs("read", {
+          path: `Projects/${input.project as string}/backlog.md`,
+        }),
+      );
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

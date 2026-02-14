@@ -523,3 +523,41 @@ describe("return value", () => {
     expect(result).toBe("vault info here");
   });
 });
+
+// ── Project Backlog ─────────────────────────────────────────────────────
+
+describe("backlog_add", () => {
+  it("appends a task item to the project backlog", async () => {
+    await handleTool("backlog_add", { project: "Acme", item: "Fix login bug" });
+    const args = calledWith();
+    expect(args[0]).toBe("append");
+    expect(args).toContain("path=Projects/Acme/backlog.md");
+    expect(args).toContain("content=- [ ] Fix login bug");
+    expect(args).toContain("silent");
+  });
+
+  it("includes @priority tag when priority is set", async () => {
+    await handleTool("backlog_add", {
+      project: "Acme",
+      item: "Upgrade deps",
+      priority: "high",
+    });
+    const args = calledWith();
+    expect(args).toContain("content=- [ ] Upgrade deps @high");
+  });
+
+  it("omits priority tag when not provided", async () => {
+    await handleTool("backlog_add", { project: "Acme", item: "Write docs" });
+    const args = calledWith();
+    expect(args).toContain("content=- [ ] Write docs");
+  });
+});
+
+describe("backlog_read", () => {
+  it("reads the project backlog file", async () => {
+    await handleTool("backlog_read", { project: "Acme" });
+    const args = calledWith();
+    expect(args[0]).toBe("read");
+    expect(args).toContain("path=Projects/Acme/backlog.md");
+  });
+});

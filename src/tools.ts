@@ -43,6 +43,10 @@ function objectSchema(
  *  7. Links -- outgoing link discovery.
  *  8. Tags (extended) -- detailed tag information.
  *  9. File Management, Bases -- moving files and querying structured views.
+ * 10. Project Backlog -- per-project backlog management.
+ */
+/**
+ * Complete list of MCP tools exposed by this server (28 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -593,6 +597,51 @@ export const tools: Tool[] = [
         },
       },
       ["base"],
+    ),
+  },
+
+  // ── Project Backlog ───────────────────────────────────────────────────
+
+  {
+    name: "backlog_add",
+    description:
+      "Add an item to a project's backlog. The backlog is stored at " +
+      "'Projects/<project>/backlog.md'. Creates the file if it does not exist. " +
+      "Items are appended as task checkboxes. Use the priority parameter to tag " +
+      "an item with @high, @medium, or @low.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (used as folder name under Projects/)",
+        },
+        item: {
+          type: "string",
+          description: "Backlog item description",
+        },
+        priority: {
+          type: "string",
+          enum: ["high", "medium", "low"],
+          description: "Priority tag appended as @high, @medium, or @low",
+        },
+      },
+      ["project", "item"],
+    ),
+  },
+
+  {
+    name: "backlog_read",
+    description:
+      "Read a project's backlog. Returns the contents of " +
+      "'Projects/<project>/backlog.md'.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (used as folder name under Projects/)",
+        },
+      },
+      ["project"],
     ),
   },
 ];

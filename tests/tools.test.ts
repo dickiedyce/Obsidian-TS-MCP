@@ -28,11 +28,13 @@ const EXPECTED_TOOL_NAMES = [
   "get_tag_info",
   "move_file",
   "query_base",
+  "backlog_add",
+  "backlog_read",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 26 tools", () => {
-    expect(tools).toHaveLength(26);
+  it("exports exactly 28 tools", () => {
+    expect(tools).toHaveLength(28);
   });
 
   it("has all expected tool names", () => {
@@ -252,5 +254,26 @@ describe("specific schemas", () => {
       { enum?: string[] }
     >;
     expect(props.sort.enum).toEqual(["name", "count"]);
+  });
+
+  // ── Project Backlog ─────────────────────────────────────────────────
+
+  it("backlog_add requires 'project' and 'item'", () => {
+    const schema = byName("backlog_add").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+    expect(schema.required).toContain("item");
+  });
+
+  it("backlog_add priority enum has high, medium, low", () => {
+    const props = byName("backlog_add").inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+    expect(props.priority.enum).toEqual(["high", "medium", "low"]);
+  });
+
+  it("backlog_read requires 'project'", () => {
+    const schema = byName("backlog_read").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
   });
 });

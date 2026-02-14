@@ -1,7 +1,7 @@
 # Obsidian-TS-MCP -- Copilot Instructions
 
 This is an MCP server written in TypeScript that wraps the official Obsidian CLI
-(v1.12+). It exposes 26 tools over the Model Context Protocol for AI agents to
+(v1.12+). It exposes 28 tools over the Model Context Protocol for AI agents to
 read, write, search, and manage notes in an Obsidian vault.
 
 ## Project context
@@ -18,7 +18,7 @@ read, write, search, and manage notes in an Obsidian vault.
 | Module | Role |
 |---|---|
 | `src/cli.ts` | Low-level CLI wrapper (`runObsidian`, `buildArgs`, `ObsidianCliError`). |
-| `src/tools.ts` | 16 MCP tool definitions (names, descriptions, JSON schemas). |
+| `src/tools.ts` | 28 MCP tool definitions (names, descriptions, JSON schemas). |
 | `src/handlers.ts` | Dispatches tool calls to CLI commands (`handleTool`). |
 | `src/validation.ts` | Input validation against tool schemas (`validateInput`, `ValidationError`). |
 | `src/server.ts` | MCP server entry-point (stdio transport, error formatting). |
