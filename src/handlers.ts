@@ -403,6 +403,314 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       return `Created project: ${project}`;
     }
 
+    // ── Project Context & Summaries ─────────────────────────────────────
+
+    case "project_context": {
+      const project = input.project as string;
+      const sessionCount = (input.sessions as number | undefined) ?? 3;
+      const sections: string[] = [];
+
+      // 1. Project overview
+      const overview = await runObsidian(
+        buildArgs("read", { path: `Projects/${project}/overview.md` }),
+      );
+      sections.push("## Overview\n\n" + overview);
+
+      // 2. Open backlog items
+      const backlog = await runObsidian(
+        buildArgs("read", { path: `Projects/${project}/backlog.md` }),
+      );
+      const openItems = backlog
+        .split("\n")
+        .filter((line) => line.startsWith("- [ ] "));
+      sections.push(
+        "## Open Backlog Items (" + openItems.length + ")\n\n" +
+        (openItems.length > 0 ? openItems.join("\n") : "(none)"),
+      );
+
+      // 3. Recent session notes
+      const listing = await runObsidian(
+        buildArgs("files", { folder: `Projects/${project}`, ext: "md" }),
+      );
+      const sessionFiles = listing
+        .split("\n")
+        .filter((f) =>
+          f.match(/Projects\/[^/]+\/\d{4}-\d{2}-\d{2}/) !== null,
+        )
+        .sort()
+        .reverse()
+        .slice(0, sessionCount);
+
+      if (sessionFiles.length > 0) {
+        const sessionSections: string[] = [];
+        for (const file of sessionFiles) {
+          const content = await runObsidian(
+            buildArgs("read", { path: file }),
+          );
+          sessionSections.push("### " + file.split("/").pop() + "\n\n" + content);
+        }
+        sections.push(
+          "## Recent Sessions (" + sessionFiles.length + ")\n\n" +
+          sessionSections.join("\n\n---\n\n"),
+        );
+      } else {
+        sections.push("## Recent Sessions\n\n(no session notes found)");
+      }
+
+      return sections.join("\n\n---\n\n");
+    }
+
+    case "project_summary": {
+      const project = input.project as string;
+      const days = (input.days as number | undefined) ?? 7;
+
+      // Calculate the cutoff date
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10); // YYYY-MM-DD
+
+      // List session files for the project
+      const listing = await runObsidian(
+        buildArgs("files", { folder: `Projects/${project}`, ext: "md" }),
+      );
+      const sessionFiles = listing
+        .split("\n")
+        .filter((f) => {
+          const match = f.match(/(\d{4}-\d{2}-\d{2})/);
+          return match !== null && match[1] >= cutoffStr;
+        })
+        .sort();
+
+      if (sessionFiles.length === 0) {
+        return `No session notes found for ${project} in the last ${days} days.`;
+      }
+
+      // Read each session and collect content
+      const sessions: string[] = [];
+      for (const file of sessionFiles) {
+        const content = await runObsidian(
+          buildArgs("read", { path: file }),
+        );
+        const filename = file.split("/").pop() ?? file;
+        sessions.push("### " + filename.replace(/\.md$/, "") + "\n\n" + content);
+      }
+
+      // Read open backlog for context
+      const backlog = await runObsidian(
+        buildArgs("read", { path: `Projects/${project}/backlog.md` }),
+      );
+      const openItems = backlog
+        .split("\n")
+        .filter((line) => line.startsWith("- [ ] "));
+      const doneItems = backlog
+        .split("\n")
+        .filter((line) => line.startsWith("- [x] "));
+
+      const summary = [
+        `# Project Summary: ${project}`,
+        `Period: ${cutoffStr} to ${new Date().toISOString().slice(0, 10)}`,
+        `Sessions: ${sessionFiles.length}`,
+        `Open backlog items: ${openItems.length}`,
+        `Completed backlog items: ${doneItems.length}`,
+        "",
+        "## Session Activity",
+        "",
+        sessions.join("\n\n---\n\n"),
+        "",
+        "## Open Backlog",
+        "",
+        openItems.length > 0 ? openItems.join("\n") : "(none)",
+      ];
+
+      return summary.join("\n");
+    }
+
+    case "project_dashboard": {
+      const format = (input.format as string | undefined) ?? "md";
+
+      // List all projects
+      const listing = await runObsidian(
+        buildArgs("files", { folder: "Projects", ext: "md" }),
+      );
+      const allFiles = listing.split("\n").filter(Boolean);
+      const projectNames = [
+        ...new Set(
+          allFiles
+            .map((line) => line.replace(/^Projects\//, "").split("/")[0])
+            .filter(Boolean),
+        ),
+      ];
+
+      interface ProjectInfo {
+        name: string;
+        status: string;
+        lastActivity: string;
+        openBacklog: number;
+        sessionCount: number;
+      }
+
+      const projects: ProjectInfo[] = [];
+
+      for (const name of projectNames) {
+        const projectFiles = allFiles.filter((f) =>
+          f.startsWith(`Projects/${name}/`),
+        );
+
+        // Count sessions (files matching date pattern)
+        const sessionFiles = projectFiles.filter(
+          (f) => f.match(/\d{4}-\d{2}-\d{2}/) !== null,
+        );
+
+        // Find the most recent session date
+        const dates = sessionFiles
+          .map((f) => {
+            const m = f.match(/(\d{4}-\d{2}-\d{2})/);
+            return m ? m[1] : "";
+          })
+          .filter(Boolean)
+          .sort()
+          .reverse();
+        const lastActivity = dates[0] ?? "none";
+
+        // Count open backlog items
+        let openBacklog = 0;
+        let status = "unknown";
+        try {
+          const backlog = await runObsidian(
+            buildArgs("read", {
+              path: `Projects/${name}/backlog.md`,
+            }),
+          );
+          openBacklog = backlog
+            .split("\n")
+            .filter((line) => line.startsWith("- [ ] ")).length;
+        } catch {
+          // backlog may not exist
+        }
+
+        // Read project status from overview
+        try {
+          const overviewRaw = await runObsidian(
+            buildArgs("read", {
+              path: `Projects/${name}/overview.md`,
+            }),
+          );
+          const statusMatch = overviewRaw.match(/^status:\s*(.+)$/m);
+          if (statusMatch) status = statusMatch[1].trim();
+        } catch {
+          // overview may not exist
+        }
+
+        projects.push({
+          name,
+          status,
+          lastActivity,
+          openBacklog,
+          sessionCount: sessionFiles.length,
+        });
+      }
+
+      // Sort by last activity (most recent first)
+      projects.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+
+      if (format === "json") {
+        return JSON.stringify(projects, null, 2);
+      }
+
+      // Markdown table
+      const lines = [
+        "# Project Dashboard",
+        "",
+        "| Project | Status | Last Activity | Open Backlog | Sessions |",
+        "|---------|--------|---------------|--------------|----------|",
+      ];
+      for (const p of projects) {
+        lines.push(
+          `| ${p.name} | ${p.status} | ${p.lastActivity} | ${p.openBacklog} | ${p.sessionCount} |`,
+        );
+      }
+      return lines.join("\n");
+    }
+
+    case "backlog_prioritise": {
+      const project = input.project as string;
+      const item = input.item as string;
+      const position = input.position as number;
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      // Read current backlog
+      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+      const lines = content.split("\n");
+
+      // Separate heading/non-task lines from task lines
+      const headingLines: string[] = [];
+      const taskLines: string[] = [];
+      let pastHeading = false;
+      for (const line of lines) {
+        if (line.startsWith("- [")) {
+          pastHeading = true;
+          taskLines.push(line);
+        } else if (!pastHeading) {
+          headingLines.push(line);
+        } else {
+          // Non-task lines after tasks (e.g. blank lines between tasks)
+          taskLines.push(line);
+        }
+      }
+
+      // Find the unchecked task matching the item substring
+      const uncheckedIndices: number[] = [];
+      let sourceIdx = -1;
+      for (let i = 0; i < taskLines.length; i++) {
+        if (taskLines[i].startsWith("- [ ] ")) {
+          uncheckedIndices.push(i);
+          if (sourceIdx === -1 && taskLines[i].includes(item)) {
+            sourceIdx = i;
+          }
+        }
+      }
+
+      if (sourceIdx === -1) {
+        throw new Error(
+          `No unchecked backlog item matching "${item}" in ${backlogPath}`,
+        );
+      }
+
+      // Remove the item from its current position
+      const movedLine = taskLines.splice(sourceIdx, 1)[0];
+
+      // Recalculate unchecked indices after removal
+      const newUnchecked: number[] = [];
+      for (let i = 0; i < taskLines.length; i++) {
+        if (taskLines[i].startsWith("- [ ] ")) {
+          newUnchecked.push(i);
+        }
+      }
+
+      // Insert at the target position (1-based, among unchecked items)
+      const targetPos = Math.min(
+        Math.max(1, position),
+        newUnchecked.length + 1,
+      );
+      const insertIdx =
+        targetPos <= newUnchecked.length
+          ? newUnchecked[targetPos - 1]
+          : taskLines.length;
+      taskLines.splice(insertIdx, 0, movedLine);
+
+      // Reconstruct the file
+      const newContent = [...headingLines, ...taskLines].join("\n");
+      await runObsidian(
+        buildArgs("create", {
+          name: backlogPath.replace(/\.md$/, ""),
+          content: newContent,
+          overwrite: true,
+          silent: true,
+        }),
+      );
+      return `Moved "${item}" to position ${targetPos}`;
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

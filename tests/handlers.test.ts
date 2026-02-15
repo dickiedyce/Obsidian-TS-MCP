@@ -677,3 +677,145 @@ describe("project_create", () => {
     expect(content).toContain("- React");
   });
 });
+
+// ── Project Context & Summaries ─────────────────────────────────────────
+
+describe("project_context", () => {
+  it("returns overview, backlog, and recent sessions", async () => {
+    mockRun
+      .mockResolvedValueOnce("# Overview\nProject info here") // overview read
+      .mockResolvedValueOnce("# Backlog\n- [ ] Task 1\n- [x] Task 2\n") // backlog read
+      .mockResolvedValueOnce( // list files
+        "Projects/Acme/overview.md\nProjects/Acme/backlog.md\n" +
+        "Projects/Acme/2026-02-10 Session A.md\nProjects/Acme/2026-02-12 Session B.md",
+      )
+      .mockResolvedValueOnce("Session B content") // read most recent
+      .mockResolvedValueOnce("Session A content"); // read second recent
+
+    const result = await handleTool("project_context", { project: "Acme" });
+
+    expect(result).toContain("## Overview");
+    expect(result).toContain("Project info here");
+    expect(result).toContain("## Open Backlog Items (1)");
+    expect(result).toContain("- [ ] Task 1");
+    expect(result).toContain("## Recent Sessions (2)");
+    expect(result).toContain("Session B content");
+    expect(result).toContain("Session A content");
+  });
+
+  it("limits session count via sessions parameter", async () => {
+    mockRun
+      .mockResolvedValueOnce("overview") // overview
+      .mockResolvedValueOnce("# Backlog\n") // backlog
+      .mockResolvedValueOnce( // list files
+        "Projects/Acme/2026-02-10 A.md\nProjects/Acme/2026-02-11 B.md\nProjects/Acme/2026-02-12 C.md",
+      )
+      .mockResolvedValueOnce("C content"); // only 1 session
+
+    await handleTool("project_context", { project: "Acme", sessions: 1 });
+
+    // 4 calls: overview, backlog, list, 1 session read
+    expect(mockRun).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("project_summary", () => {
+  it("returns summary with session activity", async () => {
+    mockRun
+      .mockResolvedValueOnce( // list files
+        "Projects/Acme/2026-02-10 Fix.md\nProjects/Acme/2026-02-12 Feature.md",
+      )
+      .mockResolvedValueOnce("Fix session content") // read first
+      .mockResolvedValueOnce("Feature session content") // read second
+      .mockResolvedValueOnce("# Backlog\n- [ ] Open item\n- [x] Done item\n"); // backlog
+
+    const result = await handleTool("project_summary", { project: "Acme" });
+
+    expect(result).toContain("# Project Summary: Acme");
+    expect(result).toContain("Sessions: 2");
+    expect(result).toContain("Open backlog items: 1");
+    expect(result).toContain("Completed backlog items: 1");
+    expect(result).toContain("Fix session content");
+    expect(result).toContain("Feature session content");
+  });
+
+  it("returns message when no sessions found", async () => {
+    mockRun.mockResolvedValueOnce("Projects/Acme/overview.md\n"); // no dated files
+
+    const result = await handleTool("project_summary", { project: "Acme" });
+    expect(result).toContain("No session notes found");
+  });
+});
+
+describe("project_dashboard", () => {
+  it("returns markdown table by default", async () => {
+    mockRun
+      .mockResolvedValueOnce( // list all project files
+        "Projects/Acme/overview.md\nProjects/Acme/backlog.md\n" +
+        "Projects/Acme/2026-02-10 Session.md\n" +
+        "Projects/Beta/overview.md\nProjects/Beta/backlog.md\n",
+      )
+      .mockResolvedValueOnce("# Backlog\n- [ ] Task 1\n- [ ] Task 2\n") // Acme backlog
+      .mockResolvedValueOnce("---\nstatus: active\n---\n# Acme") // Acme overview
+      .mockResolvedValueOnce("# Backlog\n") // Beta backlog
+      .mockResolvedValueOnce("---\nstatus: paused\n---\n# Beta"); // Beta overview
+
+    const result = await handleTool("project_dashboard", {});
+
+    expect(result).toContain("# Project Dashboard");
+    expect(result).toContain("| Acme | active | 2026-02-10 | 2 | 1 |");
+    expect(result).toContain("| Beta | paused | none | 0 | 0 |");
+  });
+
+  it("returns JSON when format is json", async () => {
+    mockRun
+      .mockResolvedValueOnce("Projects/Acme/overview.md\nProjects/Acme/backlog.md\n")
+      .mockResolvedValueOnce("# Backlog\n")
+      .mockResolvedValueOnce("---\nstatus: active\n---\n");
+
+    const result = await handleTool("project_dashboard", { format: "json" });
+    const parsed = JSON.parse(result);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].name).toBe("Acme");
+  });
+});
+
+describe("backlog_prioritise", () => {
+  it("moves an item to the specified position", async () => {
+    const backlog =
+      "# Backlog -- Acme\n- [ ] Task A\n- [ ] Task B @high\n- [ ] Task C\n";
+    mockRun
+      .mockResolvedValueOnce(backlog) // read
+      .mockResolvedValueOnce("ok"); // write
+
+    const result = await handleTool("backlog_prioritise", {
+      project: "Acme",
+      item: "Task C",
+      position: 1,
+    });
+
+    expect(result).toContain("Task C");
+    expect(result).toContain("position 1");
+
+    // Verify the written content has Task C first
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="));
+    expect(content).toBeDefined();
+    const contentStr = content!.replace("content=", "");
+    const taskLines = contentStr.split("\n").filter((l) => l.startsWith("- [ ]"));
+    expect(taskLines[0]).toContain("Task C");
+    expect(taskLines[1]).toContain("Task A");
+    expect(taskLines[2]).toContain("Task B");
+  });
+
+  it("throws when no matching item is found", async () => {
+    mockRun.mockResolvedValueOnce("# Backlog\n- [x] Done item\n");
+    await expect(
+      handleTool("backlog_prioritise", {
+        project: "Acme",
+        item: "Nonexistent",
+        position: 1,
+      }),
+    ).rejects.toThrow(/No unchecked backlog item matching/);
+  });
+});

@@ -34,11 +34,15 @@ const EXPECTED_TOOL_NAMES = [
   "project_list",
   "project_overview",
   "project_create",
+  "project_context",
+  "project_summary",
+  "project_dashboard",
+  "backlog_prioritise",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 32 tools", () => {
-    expect(tools).toHaveLength(32);
+  it("exports exactly 36 tools", () => {
+    expect(tools).toHaveLength(36);
   });
 
   it("has all expected tool names", () => {
@@ -301,5 +305,37 @@ describe("specific schemas", () => {
     const schema = byName("project_create").inputSchema as { required?: string[] };
     expect(schema.required).toContain("project");
     expect(schema.required).toContain("description");
+  });
+
+  // ── Project Context & Summaries ────────────────────────────────────
+
+  it("project_context requires 'project'", () => {
+    const schema = byName("project_context").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+  });
+
+  it("project_summary requires 'project'", () => {
+    const schema = byName("project_summary").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+  });
+
+  it("project_dashboard has no required fields", () => {
+    const schema = byName("project_dashboard").inputSchema as { required?: string[] };
+    expect(schema.required).toBeUndefined();
+  });
+
+  it("project_dashboard format enum has json and md", () => {
+    const props = byName("project_dashboard").inputSchema.properties as Record<
+      string,
+      { enum?: string[] }
+    >;
+    expect(props.format.enum).toEqual(["json", "md"]);
+  });
+
+  it("backlog_prioritise requires 'project', 'item', and 'position'", () => {
+    const schema = byName("backlog_prioritise").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+    expect(schema.required).toContain("item");
+    expect(schema.required).toContain("position");
   });
 });

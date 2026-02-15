@@ -46,7 +46,7 @@ function objectSchema(
  * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (32 tools).
+ * Complete list of MCP tools exposed by this server (36 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -718,6 +718,92 @@ export const tools: Tool[] = [
         },
       },
       ["project", "description"],
+    ),
+  },
+
+  // ── Project Context & Summaries ─────────────────────────────────────
+
+  {
+    name: "project_context",
+    description:
+      "Load full context for a project in a single call: returns the project " +
+      "overview, the most recent session notes, and open backlog items. Use this " +
+      "at the start of a session to understand the project state before working.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+        sessions: {
+          type: "number",
+          description:
+            "Number of recent session notes to include (default: 3)",
+        },
+      },
+      ["project"],
+    ),
+  },
+
+  {
+    name: "project_summary",
+    description:
+      "Generate a summary of project activity over a date range. Aggregates " +
+      "session notes to produce completed goals, open follow-ups, and an " +
+      "activity timeline. Defaults to the last 7 days.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+        days: {
+          type: "number",
+          description: "Number of days to look back (default: 7)",
+        },
+      },
+      ["project"],
+    ),
+  },
+
+  {
+    name: "project_dashboard",
+    description:
+      "Cross-project dashboard. Returns all projects with their status, last " +
+      "activity date, open backlog item count, and total session count. Use " +
+      "this to decide what to work on or generate standup summaries.",
+    inputSchema: objectSchema({
+      format: {
+        type: "string",
+        enum: ["json", "md"],
+        description: "Output format (default: md)",
+      },
+    }),
+  },
+
+  {
+    name: "backlog_prioritise",
+    description:
+      "Reorder a project's backlog by moving an item to a specific position. " +
+      "Position 1 is the top of the backlog. The item is identified by a " +
+      "substring match against unchecked items.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+        item: {
+          type: "string",
+          description:
+            "Substring to match against unchecked backlog items",
+        },
+        position: {
+          type: "number",
+          description: "Target position (1-based, 1 = top of backlog)",
+        },
+      },
+      ["project", "item", "position"],
     ),
   },
 ];
