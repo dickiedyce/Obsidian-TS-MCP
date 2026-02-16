@@ -13,7 +13,7 @@ import { runObsidian, buildArgs } from "./cli.js";
 import { validateInput } from "./validation.js";
 
 /** Loosely-typed input object received from MCP tool calls. */
-export type ToolInput = Record<string, string | number | boolean | undefined>;
+export type ToolInput = Record<string, string | number | boolean | string[] | undefined>;
 
 /**
  * Route an MCP tool call to the appropriate Obsidian CLI command.
@@ -279,14 +279,49 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const project = input.project as string;
       const item = input.item as string;
       const priority = input.priority as string | undefined;
-      const line = priority ? `- [ ] ${item} @${priority}` : `- [ ] ${item}`;
-      return runObsidian(
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      // Check if backlog exists and read current content
+      let existingContent = "";
+      try {
+        existingContent = await runObsidian(buildArgs("read", { path: backlogPath }));
+      } catch {
+        // File doesn't exist, create it with a heading
+        await runObsidian(
+          buildArgs("create", {
+            name: backlogPath.replace(/\.md$/, ""),
+            content: `# Backlog\n\n`,
+            silent: true,
+          }),
+        );
+      }
+
+      // Check for duplicates (case-insensitive, ignoring priority tags)
+      const normalizedItem = item.toLowerCase().trim();
+      const existingLines = existingContent.split("\n");
+      for (const line of existingLines) {
+        if (line.startsWith("- [ ] ")) {
+          // Extract item text without priority tag for comparison
+          const existingText = line
+            .slice(6)
+            .replace(/@(high|medium|low)\s*$/i, "")
+            .trim()
+            .toLowerCase();
+          if (existingText === normalizedItem) {
+            return `Skipped: duplicate item already exists in backlog`;
+          }
+        }
+      }
+
+      const taskLine = priority ? `- [ ] ${item} @${priority}` : `- [ ] ${item}`;
+      await runObsidian(
         buildArgs("append", {
-          path: `Projects/${project}/backlog.md`,
-          content: line,
+          path: backlogPath,
+          content: taskLine,
           silent: true,
         }),
       );
+      return `Added to backlog: ${item}`;
     }
 
     case "backlog_read":
@@ -638,76 +673,40 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const position = input.position as number;
       const backlogPath = `Projects/${project}/backlog.md`;
 
-      // Read current backlog
+      // Read current backlog to get unchecked items
       const content = await runObsidian(buildArgs("read", { path: backlogPath }));
-      const lines = content.split("\n");
 
-      // Separate heading/non-task lines from task lines
-      const headingLines: string[] = [];
-      const taskLines: string[] = [];
-      let pastHeading = false;
-      for (const line of lines) {
-        if (line.startsWith("- [")) {
-          pastHeading = true;
-          taskLines.push(line);
-        } else if (!pastHeading) {
-          headingLines.push(line);
-        } else {
-          // Non-task lines after tasks (e.g. blank lines between tasks)
-          taskLines.push(line);
+      // Extract unchecked task content (without checkbox prefix)
+      const unchecked: string[] = [];
+      for (const line of content.split("\n")) {
+        if (line.startsWith("- [ ] ")) {
+          unchecked.push(line.slice(6));
         }
       }
 
-      // Find the unchecked task matching the item substring
-      const uncheckedIndices: number[] = [];
-      let sourceIdx = -1;
-      for (let i = 0; i < taskLines.length; i++) {
-        if (taskLines[i].startsWith("- [ ] ")) {
-          uncheckedIndices.push(i);
-          if (sourceIdx === -1 && taskLines[i].includes(item)) {
-            sourceIdx = i;
-          }
-        }
-      }
-
-      if (sourceIdx === -1) {
+      // Find the item matching the substring
+      const matchIdx = unchecked.findIndex((task) => task.includes(item));
+      if (matchIdx === -1) {
         throw new Error(
           `No unchecked backlog item matching "${item}" in ${backlogPath}`,
         );
       }
 
-      // Remove the item from its current position
-      const movedLine = taskLines.splice(sourceIdx, 1)[0];
+      // Remove the matched item temporarily
+      const matched = unchecked.splice(matchIdx, 1)[0];
 
-      // Recalculate unchecked indices after removal
-      const newUnchecked: number[] = [];
-      for (let i = 0; i < taskLines.length; i++) {
-        if (taskLines[i].startsWith("- [ ] ")) {
-          newUnchecked.push(i);
-        }
-      }
+      // Calculate target position (1-based, clamped)
+      const targetPos = Math.min(Math.max(1, position), unchecked.length + 1);
 
-      // Insert at the target position (1-based, among unchecked items)
-      const targetPos = Math.min(
-        Math.max(1, position),
-        newUnchecked.length + 1,
-      );
-      const insertIdx =
-        targetPos <= newUnchecked.length
-          ? newUnchecked[targetPos - 1]
-          : taskLines.length;
-      taskLines.splice(insertIdx, 0, movedLine);
+      // Build items array: items before target, matched item, items after target
+      const items = [
+        ...unchecked.slice(0, targetPos - 1),
+        matched,
+        ...unchecked.slice(targetPos - 1),
+      ];
 
-      // Reconstruct the file
-      const newContent = [...headingLines, ...taskLines].join("\n");
-      await runObsidian(
-        buildArgs("create", {
-          name: backlogPath.replace(/\.md$/, ""),
-          content: newContent,
-          overwrite: true,
-          silent: true,
-        }),
-      );
+      // Delegate to backlog_reorder
+      await handleTool("backlog_reorder", { project, items });
       return `Moved "${item}" to position ${targetPos}`;
     }
 

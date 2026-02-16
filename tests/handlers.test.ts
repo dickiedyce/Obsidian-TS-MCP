@@ -528,28 +528,91 @@ describe("return value", () => {
 
 describe("backlog_add", () => {
   it("appends a task item to the project backlog", async () => {
-    await handleTool("backlog_add", { project: "Acme", item: "Fix login bug" });
-    const args = calledWith();
-    expect(args[0]).toBe("append");
-    expect(args).toContain("path=Projects/Acme/backlog.md");
-    expect(args).toContain("content=- [ ] Fix login bug");
-    expect(args).toContain("silent");
+    // First call reads existing backlog, second appends
+    mockRun
+      .mockResolvedValueOnce("# Backlog\n")
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_add", { project: "Acme", item: "Fix login bug" });
+
+    expect(mockRun).toHaveBeenCalledTimes(2);
+    const appendArgs = mockRun.mock.calls[1][0] as string[];
+    expect(appendArgs[0]).toBe("append");
+    expect(appendArgs).toContain("path=Projects/Acme/backlog.md");
+    expect(appendArgs).toContain("content=- [ ] Fix login bug");
+    expect(appendArgs).toContain("silent");
+    expect(result).toContain("Added to backlog");
   });
 
   it("includes @priority tag when priority is set", async () => {
+    mockRun
+      .mockResolvedValueOnce("# Backlog\n")
+      .mockResolvedValueOnce("ok");
+
     await handleTool("backlog_add", {
       project: "Acme",
       item: "Upgrade deps",
       priority: "high",
     });
-    const args = calledWith();
-    expect(args).toContain("content=- [ ] Upgrade deps @high");
+
+    const appendArgs = mockRun.mock.calls[1][0] as string[];
+    expect(appendArgs).toContain("content=- [ ] Upgrade deps @high");
   });
 
   it("omits priority tag when not provided", async () => {
+    mockRun
+      .mockResolvedValueOnce("# Backlog\n")
+      .mockResolvedValueOnce("ok");
+
     await handleTool("backlog_add", { project: "Acme", item: "Write docs" });
-    const args = calledWith();
-    expect(args).toContain("content=- [ ] Write docs");
+
+    const appendArgs = mockRun.mock.calls[1][0] as string[];
+    expect(appendArgs).toContain("content=- [ ] Write docs");
+  });
+
+  it("creates backlog file with heading if it does not exist", async () => {
+    // First read throws (file not found), then create, then append
+    mockRun
+      .mockRejectedValueOnce(new Error("File not found"))
+      .mockResolvedValueOnce("ok") // create
+      .mockResolvedValueOnce("ok"); // append
+
+    await handleTool("backlog_add", { project: "NewProj", item: "First task" });
+
+    expect(mockRun).toHaveBeenCalledTimes(3);
+    const createArgs = mockRun.mock.calls[1][0] as string[];
+    expect(createArgs[0]).toBe("create");
+    expect(createArgs).toContain("name=Projects/NewProj/backlog");
+    expect(createArgs.find((a) => a.startsWith("content="))).toContain("# Backlog");
+  });
+
+  it("skips duplicate items", async () => {
+    mockRun.mockResolvedValueOnce("# Backlog\n- [ ] Fix login bug\n");
+
+    const result = await handleTool("backlog_add", { project: "Acme", item: "Fix login bug" });
+
+    expect(mockRun).toHaveBeenCalledTimes(1); // Only read, no append
+    expect(result).toContain("Skipped: duplicate");
+  });
+
+  it("skips duplicates ignoring case and priority tags", async () => {
+    mockRun.mockResolvedValueOnce("# Backlog\n- [ ] Fix Login Bug @high\n");
+
+    const result = await handleTool("backlog_add", { project: "Acme", item: "fix login bug" });
+
+    expect(mockRun).toHaveBeenCalledTimes(1);
+    expect(result).toContain("Skipped: duplicate");
+  });
+
+  it("allows similar but different items", async () => {
+    mockRun
+      .mockResolvedValueOnce("# Backlog\n- [ ] Fix login bug\n")
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_add", { project: "Acme", item: "Fix logout bug" });
+
+    expect(mockRun).toHaveBeenCalledTimes(2);
+    expect(result).toContain("Added to backlog");
   });
 });
 
@@ -785,8 +848,9 @@ describe("backlog_prioritise", () => {
     const backlog =
       "# Backlog -- Acme\n- [ ] Task A\n- [ ] Task B @high\n- [ ] Task C\n";
     mockRun
-      .mockResolvedValueOnce(backlog) // read
-      .mockResolvedValueOnce("ok"); // write
+      .mockResolvedValueOnce(backlog) // prioritise read
+      .mockResolvedValueOnce(backlog) // reorder read
+      .mockResolvedValueOnce("ok"); // reorder write
 
     const result = await handleTool("backlog_prioritise", {
       project: "Acme",
@@ -797,8 +861,8 @@ describe("backlog_prioritise", () => {
     expect(result).toContain("Task C");
     expect(result).toContain("position 1");
 
-    // Verify the written content has Task C first
-    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    // Verify the written content has Task C first (call index 2 = reorder write)
+    const writeArgs = mockRun.mock.calls[2][0] as string[];
     const content = writeArgs.find((a) => a.startsWith("content="));
     expect(content).toBeDefined();
     const contentStr = content!.replace("content=", "");
@@ -823,8 +887,9 @@ describe("backlog_prioritise", () => {
     const backlog =
       "# Backlog -- Acme\n\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n";
     mockRun
-      .mockResolvedValueOnce(backlog)
-      .mockResolvedValueOnce("ok");
+      .mockResolvedValueOnce(backlog) // prioritise read
+      .mockResolvedValueOnce(backlog) // reorder read
+      .mockResolvedValueOnce("ok"); // reorder write
 
     const result = await handleTool("backlog_prioritise", {
       project: "Acme",
@@ -833,7 +898,7 @@ describe("backlog_prioritise", () => {
     });
 
     expect(result).toContain("position 2");
-    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const writeArgs = mockRun.mock.calls[2][0] as string[];
     const content = writeArgs.find((a) => a.startsWith("content="));
     const contentStr = content!.replace("content=", "");
     const taskLines = contentStr.split("\n").filter((l) => l.startsWith("- [ ]"));
@@ -847,8 +912,9 @@ describe("backlog_prioritise", () => {
     const backlog =
       "# Backlog -- Acme\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n";
     mockRun
-      .mockResolvedValueOnce(backlog)
-      .mockResolvedValueOnce("ok");
+      .mockResolvedValueOnce(backlog) // prioritise read
+      .mockResolvedValueOnce(backlog) // reorder read
+      .mockResolvedValueOnce("ok"); // reorder write
 
     await handleTool("backlog_prioritise", {
       project: "Acme",
@@ -856,7 +922,7 @@ describe("backlog_prioritise", () => {
       position: 1,
     });
 
-    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const writeArgs = mockRun.mock.calls[2][0] as string[];
     const content = writeArgs.find((a) => a.startsWith("content="))!;
     const contentStr = content.replace("content=", "");
     expect(contentStr).not.toContain("Loading");
