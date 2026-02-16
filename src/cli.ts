@@ -20,6 +20,14 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 /** Name of the Obsidian CLI binary expected on PATH. */
 const OBSIDIAN_BIN = "obsidian";
 
+/**
+ * Diagnostic lines the Obsidian CLI emits on stdout at startup.
+ * These must be stripped before returning output to callers, otherwise
+ * read-then-write workflows (e.g. backlog_prioritise) write the diagnostic
+ * text back into vault files.
+ */
+const CLI_NOISE_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} Loading .+$/gm;
+
 /** Raw result from an Obsidian CLI invocation. */
 export interface CliResult {
   stdout: string;
@@ -43,6 +51,16 @@ export class ObsidianCliError extends Error {
 }
 
 /**
+ * Remove Obsidian CLI startup diagnostic lines from a string.
+ * The CLI outputs "Loading updated app package ..." to stdout on every
+ * invocation; this helper strips those lines so callers receive only the
+ * command's real output.
+ */
+function stripCliNoise(text: string): string {
+  return text.replace(CLI_NOISE_RE, "").replace(/^\n+/, "");
+}
+
+/**
  * Run an Obsidian CLI command and return stdout.
  *
  * If OBSIDIAN_VAULT is set, prepends `vault=<name>` to target a specific vault.
@@ -61,11 +79,11 @@ export async function runObsidian(
   const result = await execObsidian(fullArgs, timeout);
 
   if (result.exitCode !== 0) {
-    const msg = result.stderr.trim() || result.stdout.trim() || "Command failed";
+    const msg = stripCliNoise(result.stderr.trim()) || stripCliNoise(result.stdout.trim()) || "Command failed";
     throw new ObsidianCliError(msg, result.exitCode, result.stderr);
   }
 
-  return result.stdout.trim();
+  return stripCliNoise(result.stdout.trim());
 }
 
 /**

@@ -818,4 +818,48 @@ describe("backlog_prioritise", () => {
       }),
     ).rejects.toThrow(/No unchecked backlog item matching/);
   });
+
+  it("moves the last item to position 2 (middle)", async () => {
+    const backlog =
+      "# Backlog -- Acme\n\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n";
+    mockRun
+      .mockResolvedValueOnce(backlog)
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_prioritise", {
+      project: "Acme",
+      item: "Task C",
+      position: 2,
+    });
+
+    expect(result).toContain("position 2");
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="));
+    const contentStr = content!.replace("content=", "");
+    const taskLines = contentStr.split("\n").filter((l) => l.startsWith("- [ ]"));
+    expect(taskLines[0]).toContain("Task A");
+    expect(taskLines[1]).toContain("Task C");
+    expect(taskLines[2]).toContain("Task B");
+  });
+
+  it("written content has no diagnostic noise lines", async () => {
+    // Simulate what happens if CLI noise leaks into content
+    const backlog =
+      "# Backlog -- Acme\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n";
+    mockRun
+      .mockResolvedValueOnce(backlog)
+      .mockResolvedValueOnce("ok");
+
+    await handleTool("backlog_prioritise", {
+      project: "Acme",
+      item: "Task C",
+      position: 1,
+    });
+
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="))!;
+    const contentStr = content.replace("content=", "");
+    expect(contentStr).not.toContain("Loading");
+    expect(contentStr.startsWith("# Backlog")).toBe(true);
+  });
 });

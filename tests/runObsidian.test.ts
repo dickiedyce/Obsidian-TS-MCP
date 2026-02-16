@@ -64,6 +64,35 @@ describe("runObsidian", () => {
     expect(result).toBe("vault info");
   });
 
+  it("strips CLI diagnostic 'Loading' lines from stdout", async () => {
+    mockCliCall({
+      stdout:
+        "2026-02-16 17:40:58 Loading updated app package /Users/dd/Library/Application Support/obsidian/obsidian-1.12.1.asar\n" +
+        "# Backlog\n- [ ] Task A\n",
+    });
+    const result = await runObsidian(["read"]);
+    expect(result).toBe("# Backlog\n- [ ] Task A");
+    expect(result).not.toContain("Loading");
+  });
+
+  it("strips multiple accumulated Loading lines from stdout", async () => {
+    mockCliCall({
+      stdout:
+        "2026-02-16 17:42:38 Loading updated app package /path/obsidian-1.12.1.asar\n" +
+        "2026-02-16 17:41:08 Loading updated app package /path/obsidian-1.12.1.asar\n" +
+        "2026-02-16 17:40:58 Loading updated app package /path/obsidian-1.12.1.asar\n" +
+        "# Backlog\n- [ ] Task A\n",
+    });
+    const result = await runObsidian(["read"]);
+    expect(result).toBe("# Backlog\n- [ ] Task A");
+  });
+
+  it("returns clean output when stdout has no Loading lines", async () => {
+    mockCliCall({ stdout: "# Note\nContent here\n" });
+    const result = await runObsidian(["read"]);
+    expect(result).toBe("# Note\nContent here");
+  });
+
   it("passes args to execFile", async () => {
     mockCliCall({ stdout: "ok" });
     await runObsidian(["read", "file=MyNote"]);
