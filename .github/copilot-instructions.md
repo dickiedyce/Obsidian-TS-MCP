@@ -1,7 +1,7 @@
 # Obsidian-TS-MCP -- Copilot Instructions
 
 This is an MCP server written in TypeScript that wraps the official Obsidian CLI
-(v1.12+). It exposes 31 tools over the Model Context Protocol for AI agents to
+(v1.12+). It exposes 37 tools over the Model Context Protocol for AI agents to
 read, write, search, and manage notes in an Obsidian vault.
 
 ## Project context

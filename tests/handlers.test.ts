@@ -863,3 +863,64 @@ describe("backlog_prioritise", () => {
     expect(contentStr.startsWith("# Backlog")).toBe(true);
   });
 });
+
+describe("backlog_reorder", () => {
+  it("reorders multiple items in one call", async () => {
+    const backlog =
+      "# Backlog -- Acme\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n- [ ] Task D\n";
+    mockRun
+      .mockResolvedValueOnce(backlog)
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_reorder", {
+      project: "Acme",
+      items: ["Task D", "Task B"],
+    });
+
+    expect(result).toContain("Reordered 2 items");
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="));
+    const contentStr = content!.replace("content=", "");
+    const taskLines = contentStr.split("\n").filter((l) => l.startsWith("- [ ]"));
+    expect(taskLines[0]).toContain("Task D");
+    expect(taskLines[1]).toContain("Task B");
+    expect(taskLines[2]).toContain("Task A");
+    expect(taskLines[3]).toContain("Task C");
+  });
+
+  it("reports not-found items", async () => {
+    const backlog = "# Backlog\n- [ ] Task A\n- [ ] Task B\n";
+    mockRun
+      .mockResolvedValueOnce(backlog)
+      .mockResolvedValueOnce("ok");
+
+    const result = await handleTool("backlog_reorder", {
+      project: "Acme",
+      items: ["Task B", "Nonexistent"],
+    });
+
+    expect(result).toContain("Reordered 1 item");
+    expect(result).toContain("not found: Nonexistent");
+  });
+
+  it("preserves checked items at the end", async () => {
+    const backlog =
+      "# Backlog\n- [x] Done item\n- [ ] Task A\n- [ ] Task B\n";
+    mockRun
+      .mockResolvedValueOnce(backlog)
+      .mockResolvedValueOnce("ok");
+
+    await handleTool("backlog_reorder", {
+      project: "Acme",
+      items: ["Task B"],
+    });
+
+    const writeArgs = mockRun.mock.calls[1][0] as string[];
+    const content = writeArgs.find((a) => a.startsWith("content="))!;
+    const contentStr = content.replace("content=", "");
+    const lines = contentStr.split("\n").filter((l) => l.startsWith("- ["));
+    expect(lines[0]).toContain("Task B");
+    expect(lines[1]).toContain("Task A");
+    expect(lines[2]).toContain("Done item");
+  });
+});

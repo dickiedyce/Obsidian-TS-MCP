@@ -711,6 +711,69 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       return `Moved "${item}" to position ${targetPos}`;
     }
 
+    case "backlog_reorder": {
+      const project = input.project as string;
+      const items = input.items as unknown as string[];
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      // Read current backlog
+      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+      const lines = content.split("\n");
+
+      // Separate heading/non-task lines from task lines
+      const headingLines: string[] = [];
+      const taskLines: string[] = [];
+      let pastHeading = false;
+      for (const line of lines) {
+        if (line.startsWith("- [")) {
+          pastHeading = true;
+          taskLines.push(line);
+        } else if (!pastHeading) {
+          headingLines.push(line);
+        } else {
+          taskLines.push(line);
+        }
+      }
+
+      // Separate unchecked and checked tasks
+      const unchecked = taskLines.filter((l) => l.startsWith("- [ ] "));
+      const checked = taskLines.filter((l) => l.startsWith("- [x] ") || l.startsWith("- [X] "));
+
+      // Match each item substring to an unchecked task
+      const matched: string[] = [];
+      const remaining = [...unchecked];
+      const notFound: string[] = [];
+
+      for (const substr of items) {
+        const idx = remaining.findIndex((t) => t.includes(substr));
+        if (idx !== -1) {
+          matched.push(remaining.splice(idx, 1)[0]);
+        } else {
+          notFound.push(substr);
+        }
+      }
+
+      // Reorder: matched items first, then remaining unchecked, then checked
+      const reordered = [...matched, ...remaining, ...checked];
+      const newContent = [...headingLines, ...reordered].join("\n");
+
+      await runObsidian(
+        buildArgs("create", {
+          name: backlogPath.replace(/\.md$/, ""),
+          content: newContent,
+          overwrite: true,
+          silent: true,
+        }),
+      );
+
+      const movedCount = matched.length;
+      let result = `Reordered ${movedCount} item${movedCount !== 1 ? "s" : ""} to top of backlog`;
+      if (notFound.length > 0) {
+        result += ` (not found: ${notFound.join(", ")})`;
+      }
+      return result;
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

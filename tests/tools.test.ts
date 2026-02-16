@@ -38,11 +38,12 @@ const EXPECTED_TOOL_NAMES = [
   "project_summary",
   "project_dashboard",
   "backlog_prioritise",
+  "backlog_reorder",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 36 tools", () => {
-    expect(tools).toHaveLength(36);
+  it("exports exactly 37 tools", () => {
+    expect(tools).toHaveLength(37);
   });
 
   it("has all expected tool names", () => {
@@ -337,5 +338,11 @@ describe("specific schemas", () => {
     expect(schema.required).toContain("project");
     expect(schema.required).toContain("item");
     expect(schema.required).toContain("position");
+  });
+
+  it("backlog_reorder requires 'project' and 'items'", () => {
+    const schema = byName("backlog_reorder").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+    expect(schema.required).toContain("items");
   });
 });

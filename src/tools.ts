@@ -46,7 +46,7 @@ function objectSchema(
  * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (36 tools).
+ * Complete list of MCP tools exposed by this server (37 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -804,6 +804,30 @@ export const tools: Tool[] = [
         },
       },
       ["project", "item", "position"],
+    ),
+  },
+
+  {
+    name: "backlog_reorder",
+    description:
+      "Bulk-reorder a project's backlog by providing items in desired order. " +
+      "Items are matched by substring against unchecked tasks. Matched items " +
+      "are moved to the top in the given order; unmatched items retain their " +
+      "relative position below.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+        items: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Substrings to match (in desired order, first = top of backlog)",
+        },
+      },
+      ["project", "items"],
     ),
   },
 ];
