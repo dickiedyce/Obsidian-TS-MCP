@@ -55,12 +55,21 @@ export const tools: Tool[] = [
     name: "create_note",
     description:
       "Create a new note in the Obsidian vault. Supports optional content and templates. " +
-      "Use this when you need to record a new session, decision, or piece of documentation.",
+      "Use this when you need to record a new session, decision, or piece of documentation. " +
+      "When 'path' is provided (or the name contains directory separators), the note is " +
+      "written directly to that location including any intermediate folders.",
     inputSchema: objectSchema(
       {
         name: {
           type: "string",
           description: "Note name (without .md extension)",
+        },
+        path: {
+          type: "string",
+          description:
+            "Exact vault-relative path (e.g. 'Projects/Foo/note.md'). " +
+            "Creates intermediate directories as needed. Preferred over " +
+            "embedding directory separators in the name.",
         },
         content: {
           type: "string",

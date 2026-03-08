@@ -11,9 +11,22 @@
 
 import { runObsidian, buildArgs } from "./cli.js";
 import { validateInput } from "./validation.js";
+import { writeVaultFile, readVaultFile } from "./fs-ops.js";
 
 /** Loosely-typed input object received from MCP tool calls. */
 export type ToolInput = Record<string, string | number | boolean | string[] | undefined>;
+
+/**
+ * When a `file` parameter looks like a vault path (contains `/`), move it
+ * to `path` so the CLI performs an exact lookup instead of fuzzy matching.
+ */
+function normalizeFileToPath(input: ToolInput): void {
+  const file = input.file as string | undefined;
+  if (file && file.includes("/")) {
+    input.path = file.endsWith(".md") ? file : `${file}.md`;
+    input.file = undefined;
+  }
+}
 
 /**
  * Route an MCP tool call to the appropriate Obsidian CLI command.
@@ -26,18 +39,46 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
   switch (name) {
     // ── Core: Session Journaling ──────────────────────────────────────
 
-    case "create_note":
+    case "create_note": {
+      const name = input.name as string;
+      const notePath = input.path as string | undefined;
+      const content = input.content as string | undefined;
+      const template = input.template as string | undefined;
+      const overwrite = input.overwrite as boolean | undefined;
+
+      // Use filesystem operations when an explicit path is given or the
+      // name contains directory separators -- the CLI ignores subdirectories.
+      const targetPath = notePath
+        ? (notePath.endsWith(".md") ? notePath : `${notePath}.md`)
+        : name.includes("/")
+          ? `${name}.md`
+          : undefined;
+
+      if (targetPath) {
+        let noteContent = content ?? "";
+        if (template) {
+          const resolved = await runObsidian(
+            buildArgs("template:read", { name: template, resolve: true }),
+          );
+          noteContent = content ? `${resolved}\n${content}` : resolved;
+        }
+        await writeVaultFile(targetPath, noteContent, { overwrite });
+        return `Created: ${targetPath}`;
+      }
+
       return runObsidian(
         buildArgs("create", {
-          name: input.name as string,
-          content: input.content as string | undefined,
-          template: input.template as string | undefined,
-          overwrite: input.overwrite as boolean | undefined,
+          name,
+          content,
+          template,
+          overwrite,
           silent: true,
         }),
       );
+    }
 
     case "read_note":
+      normalizeFileToPath(input);
       return runObsidian(
         buildArgs("read", {
           file: input.file as string | undefined,
@@ -46,6 +87,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       );
 
     case "append_to_note":
+      normalizeFileToPath(input);
       return runObsidian(
         buildArgs("append", {
           file: input.file as string | undefined,
@@ -56,6 +98,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       );
 
     case "prepend_to_note":
+      normalizeFileToPath(input);
       return runObsidian(
         buildArgs("prepend", {
           file: input.file as string | undefined,
@@ -281,19 +324,13 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const priority = input.priority as string | undefined;
       const backlogPath = `Projects/${project}/backlog.md`;
 
-      // Check if backlog exists and read current content
+      // Read existing backlog via filesystem for exact path matching
       let existingContent = "";
+      let fileExisted = true;
       try {
-        existingContent = await runObsidian(buildArgs("read", { path: backlogPath }));
+        existingContent = await readVaultFile(backlogPath);
       } catch {
-        // File doesn't exist, create it with a heading
-        await runObsidian(
-          buildArgs("create", {
-            name: backlogPath.replace(/\.md$/, ""),
-            content: `# Backlog\n\n`,
-            silent: true,
-          }),
-        );
+        fileExisted = false;
       }
 
       // Check for duplicates (case-insensitive, ignoring priority tags)
@@ -314,13 +351,19 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       }
 
       const taskLine = priority ? `- [ ] ${item} @${priority}` : `- [ ] ${item}`;
-      await runObsidian(
-        buildArgs("append", {
-          path: backlogPath,
-          content: taskLine,
-          silent: true,
-        }),
-      );
+
+      if (!fileExisted) {
+        // Create new backlog with heading and first task
+        await writeVaultFile(backlogPath, `# Backlog\n\n${taskLine}\n`);
+      } else {
+        // Append task to existing backlog
+        const separator = existingContent.endsWith("\n") ? "" : "\n";
+        await writeVaultFile(
+          backlogPath,
+          existingContent + separator + taskLine + "\n",
+          { overwrite: true },
+        );
+      }
       return `Added to backlog: ${item}`;
     }
 
@@ -336,8 +379,8 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const item = input.item as string;
       const backlogPath = `Projects/${project}/backlog.md`;
 
-      // Read current backlog content
-      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+      // Read current backlog content via filesystem
+      const content = await readVaultFile(backlogPath);
 
       // Find the first unchecked line containing the item substring
       const lines = content.split("\n");
@@ -363,15 +406,8 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         );
       }
 
-      // Write back using create with overwrite
-      await runObsidian(
-        buildArgs("create", {
-          name: backlogPath.replace(/\.md$/, ""),
-          content: lines.join("\n"),
-          overwrite: true,
-          silent: true,
-        }),
-      );
+      // Write back via filesystem for exact path matching
+      await writeVaultFile(backlogPath, lines.join("\n"), { overwrite: true });
       return `Marked done: ${item}`;
     }
 
@@ -420,20 +456,15 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       fmLines.push("tags:", "  - project-overview", "---");
       const overviewContent = `${fmLines.join("\n")}\n\n# ${project}\n\n${description}\n`;
 
-      // Create overview and backlog
-      await runObsidian(
-        buildArgs("create", {
-          name: `Projects/${project}/overview`,
-          content: overviewContent,
-          silent: true,
-        }),
+      // Create files using filesystem operations so that intermediate
+      // directories are created reliably.
+      await writeVaultFile(
+        `Projects/${project}/overview.md`,
+        overviewContent,
       );
-      await runObsidian(
-        buildArgs("create", {
-          name: `Projects/${project}/backlog`,
-          content: `# Backlog -- ${project}\n`,
-          silent: true,
-        }),
+      await writeVaultFile(
+        `Projects/${project}/backlog.md`,
+        `# Backlog -- ${project}\n`,
       );
       return `Created project: ${project}`;
     }
@@ -674,7 +705,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const backlogPath = `Projects/${project}/backlog.md`;
 
       // Read current backlog to get unchecked items
-      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+      const content = await readVaultFile(backlogPath);
 
       // Extract unchecked task content (without checkbox prefix)
       const unchecked: string[] = [];
@@ -715,8 +746,8 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const items = input.items as unknown as string[];
       const backlogPath = `Projects/${project}/backlog.md`;
 
-      // Read current backlog
-      const content = await runObsidian(buildArgs("read", { path: backlogPath }));
+      // Read current backlog via filesystem
+      const content = await readVaultFile(backlogPath);
       const lines = content.split("\n");
 
       // Separate heading/non-task lines from task lines
@@ -756,14 +787,8 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const reordered = [...matched, ...remaining, ...checked];
       const newContent = [...headingLines, ...reordered].join("\n");
 
-      await runObsidian(
-        buildArgs("create", {
-          name: backlogPath.replace(/\.md$/, ""),
-          content: newContent,
-          overwrite: true,
-          silent: true,
-        }),
-      );
+      // Write back via filesystem
+      await writeVaultFile(backlogPath, newContent, { overwrite: true });
 
       const movedCount = matched.length;
       let result = `Reordered ${movedCount} item${movedCount !== 1 ? "s" : ""} to top of backlog`;
