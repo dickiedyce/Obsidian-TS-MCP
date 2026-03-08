@@ -1,13 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-
-// Mock CLI module so we never call the real Obsidian binary
-vi.mock("../src/cli.js", () => ({
-  runObsidian: vi.fn(),
-  buildArgs: vi.fn((...args: unknown[]) => args),
-}));
 
 import {
   getVaultPath,
@@ -15,6 +9,12 @@ import {
   writeVaultFile,
   readVaultFile,
   vaultFileExists,
+  moveVaultFile,
+  listVaultFiles,
+  findFileByName,
+  getDailyNoteConfig,
+  getTemplatesFolder,
+  getDailyNotePath,
 } from "../src/fs-ops.js";
 
 describe("fs-ops", () => {
@@ -43,6 +43,12 @@ describe("fs-ops", () => {
       delete process.env.OBSIDIAN_VAULT_PATH;
       const second = await getVaultPath();
       expect(second).toBe(first);
+    });
+
+    it("throws a descriptive error when env var is not set", async () => {
+      delete process.env.OBSIDIAN_VAULT_PATH;
+      resetVaultPathCache();
+      await expect(getVaultPath()).rejects.toThrow(/OBSIDIAN_VAULT_PATH/);
     });
   });
 
@@ -105,4 +111,152 @@ describe("fs-ops", () => {
       expect(await vaultFileExists("no/such/dir/file.md")).toBe(false);
     });
   });
+
+  describe("moveVaultFile", () => {
+    it("moves a file to a new path", async () => {
+      await writeVaultFile("original.md", "hello");
+      await moveVaultFile("original.md", "moved/original.md");
+      expect(await vaultFileExists("moved/original.md")).toBe(true);
+      expect(await vaultFileExists("original.md")).toBe(false);
+    });
+
+    it("creates destination directory as needed", async () => {
+      await writeVaultFile("note.md", "content");
+      await moveVaultFile("note.md", "deep/path/note.md");
+      const content = await readFile(join(tmpDir, "deep/path/note.md"), "utf-8");
+      expect(content).toBe("content");
+    });
+  });
+
+  describe("listVaultFiles", () => {
+    beforeEach(async () => {
+      await writeVaultFile("root.md", "");
+      await writeVaultFile("Projects/A/overview.md", "");
+      await writeVaultFile("Projects/A/backlog.md", "");
+      await writeVaultFile("Projects/B/overview.md", "");
+      await writeVaultFile("Assets/image.png", "");
+    });
+
+    it("lists all files when no filter given", async () => {
+      const files = await listVaultFiles();
+      expect(files).toContain("root.md");
+      expect(files).toContain("Projects/A/overview.md");
+      expect(files).toContain("Assets/image.png");
+    });
+
+    it("filters by folder prefix", async () => {
+      const files = await listVaultFiles({ folder: "Projects" });
+      expect(files).toContain("Projects/A/overview.md");
+      expect(files).not.toContain("root.md");
+      expect(files).not.toContain("Assets/image.png");
+    });
+
+    it("filters by extension", async () => {
+      const files = await listVaultFiles({ ext: "md" });
+      expect(files.every((f) => f.endsWith(".md"))).toBe(true);
+      expect(files).not.toContain("Assets/image.png");
+    });
+
+    it("filters by both folder and extension", async () => {
+      const files = await listVaultFiles({ folder: "Projects", ext: "md" });
+      expect(files).toContain("Projects/A/overview.md");
+      expect(files).not.toContain("root.md");
+    });
+
+    it("skips hidden directories (.obsidian)", async () => {
+      await mkdir(join(tmpDir, ".obsidian"), { recursive: true });
+      await writeFile(join(tmpDir, ".obsidian/app.json"), "{}");
+      const files = await listVaultFiles();
+      expect(files.every((f) => !f.includes(".obsidian"))).toBe(true);
+    });
+  });
+
+  describe("findFileByName", () => {
+    beforeEach(async () => {
+      await writeVaultFile("Notes/ProjectAlpha.md", "");
+      await writeVaultFile("Archive/ProjectAlpha.md", "");
+      await writeVaultFile("Daily Notes/2026-03-08.md", "");
+    });
+
+    it("finds a file by basename", async () => {
+      const result = await findFileByName("2026-03-08");
+      expect(result).toBe("Daily Notes/2026-03-08.md");
+    });
+
+    it("returns the shallowest match when multiple files have the same name", async () => {
+      // Both Notes/ and Archive/ contain ProjectAlpha.md -- prefer shallower
+      const result = await findFileByName("ProjectAlpha");
+      // Both are at depth 2, so picks alphabetically first
+      expect(result).toMatch(/ProjectAlpha\.md$/);
+    });
+
+    it("returns null when no file matches", async () => {
+      expect(await findFileByName("NonExistent")).toBeNull();
+    });
+
+    it("matches case-insensitively", async () => {
+      const result = await findFileByName("projectalpha");
+      expect(result).not.toBeNull();
+    });
+
+    it("strips .md extension before matching", async () => {
+      const result = await findFileByName("2026-03-08.md");
+      expect(result).toBe("Daily Notes/2026-03-08.md");
+    });
+  });
+
+  describe("getDailyNoteConfig", () => {
+    it("returns defaults when config file is absent", async () => {
+      const config = await getDailyNoteConfig();
+      expect(config.folder).toBe("");
+      expect(config.format).toBe("YYYY-MM-DD");
+    });
+
+    it("reads folder and format from config file", async () => {
+      await mkdir(join(tmpDir, ".obsidian"), { recursive: true });
+      await writeFile(
+        join(tmpDir, ".obsidian/daily-notes.json"),
+        JSON.stringify({ folder: "Daily Notes", format: "YYYY/MM/DD" }),
+      );
+      const config = await getDailyNoteConfig();
+      expect(config.folder).toBe("Daily Notes");
+      expect(config.format).toBe("YYYY/MM/DD");
+    });
+  });
+
+  describe("getTemplatesFolder", () => {
+    it("returns 'Templates' when config file is absent", async () => {
+      expect(await getTemplatesFolder()).toBe("Templates");
+    });
+
+    it("reads folder from config file", async () => {
+      await mkdir(join(tmpDir, ".obsidian"), { recursive: true });
+      await writeFile(
+        join(tmpDir, ".obsidian/templates.json"),
+        JSON.stringify({ folder: "My Templates" }),
+      );
+      expect(await getTemplatesFolder()).toBe("My Templates");
+    });
+  });
+
+  describe("getDailyNotePath", () => {
+    it("returns path in vault root when folder is empty", async () => {
+      const path = await getDailyNotePath(new Date(2026, 2, 8));
+      expect(path).toMatch(/2026-03-08\.md$/);
+      expect(path).not.toContain("/");
+    });
+
+    it("includes configured folder", async () => {
+      await mkdir(join(tmpDir, ".obsidian"), { recursive: true });
+      await writeFile(
+        join(tmpDir, ".obsidian/daily-notes.json"),
+        JSON.stringify({ folder: "Daily Notes", format: "YYYY-MM-DD" }),
+      );
+      resetVaultPathCache();
+      process.env.OBSIDIAN_VAULT_PATH = tmpDir;
+      const path = await getDailyNotePath(new Date(2026, 2, 8));
+      expect(path).toBe("Daily Notes/2026-03-08.md");
+    });
+  });
 });
+
