@@ -18,8 +18,9 @@ read, write, search, and manage notes in an Obsidian vault.
 | Module | Role |
 |---|---|
 | `src/cli.ts` | Low-level CLI wrapper (`runObsidian`, `buildArgs`, `ObsidianCliError`). |
-| `src/tools.ts` | 31 MCP tool definitions (names, descriptions, JSON schemas). |
-| `src/handlers.ts` | Dispatches tool calls to CLI commands (`handleTool`). |
+| `src/fs-ops.ts` | Direct filesystem operations for vault file management, bypassing CLI when exact path control is needed. |
+| `src/tools.ts` | 37 MCP tool definitions (names, descriptions, JSON schemas). |
+| `src/handlers.ts` | Dispatches tool calls to CLI commands or filesystem ops (`handleTool`). |
 | `src/validation.ts` | Input validation against tool schemas (`validateInput`, `ValidationError`). |
 | `src/server.ts` | MCP server entry-point (stdio transport, error formatting). |
 
