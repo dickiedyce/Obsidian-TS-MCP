@@ -6,6 +6,7 @@ const EXPECTED_TOOL_NAMES = [
   "read_note",
   "append_to_note",
   "prepend_to_note",
+  "str_replace_in_note",
   "search_vault",
   "daily_note",
   "daily_append",
@@ -42,8 +43,8 @@ const EXPECTED_TOOL_NAMES = [
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 37 tools", () => {
-    expect(tools).toHaveLength(37);
+  it("exports exactly 38 tools", () => {
+    expect(tools).toHaveLength(38);
   });
 
   it("has all expected tool names", () => {
@@ -126,6 +127,14 @@ describe("specific schemas", () => {
       required?: string[];
     };
     expect(schema.required).toContain("content");
+  });
+
+  it("str_replace_in_note requires 'old_str' and 'new_str'", () => {
+    const schema = byName("str_replace_in_note").inputSchema as {
+      required?: string[];
+    };
+    expect(schema.required).toContain("old_str");
+    expect(schema.required).toContain("new_str");
   });
 
   it("search_vault requires 'query'", () => {

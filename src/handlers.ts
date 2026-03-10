@@ -165,6 +165,27 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       return `Prepended to: ${filePath}`;
     }
 
+    case "str_replace_in_note": {
+      const filePath = await resolveNotePath(input);
+      const oldStr = input.old_str as string;
+      const newStr = input.new_str as string;
+      const existing = await readVaultFile(filePath);
+
+      const firstIdx = existing.indexOf(oldStr);
+      if (firstIdx === -1) {
+        throw new Error(`old_str not found in ${filePath}`);
+      }
+      const secondIdx = existing.indexOf(oldStr, firstIdx + 1);
+      if (secondIdx !== -1) {
+        throw new Error(`old_str appears multiple times in ${filePath}`);
+      }
+
+      const updated =
+        existing.slice(0, firstIdx) + newStr + existing.slice(firstIdx + oldStr.length);
+      await writeVaultFile(filePath, updated, { overwrite: true });
+      return `Replaced in: ${filePath}`;
+    }
+
     case "search_vault": {
       const query = input.query as string;
       const pathFilter = input.path as string | undefined;

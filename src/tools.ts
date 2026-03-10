@@ -46,7 +46,7 @@ function objectSchema(
  * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (37 tools).
+ * Complete list of MCP tools exposed by this server (38 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -152,6 +152,34 @@ export const tools: Tool[] = [
         },
       },
       ["content"],
+    ),
+  },
+
+  {
+    name: "str_replace_in_note",
+    description:
+      "Replace an exact string in a note with a new string. The old string must appear " +
+      "exactly once in the note. Use this for precise, targeted edits to note content.",
+    inputSchema: objectSchema(
+      {
+        file: {
+          type: "string",
+          description: "Note name to edit",
+        },
+        path: {
+          type: "string",
+          description: "Exact path from vault root",
+        },
+        old_str: {
+          type: "string",
+          description: "The exact string to find (must appear exactly once)",
+        },
+        new_str: {
+          type: "string",
+          description: "The replacement string",
+        },
+      },
+      ["old_str", "new_str"],
     ),
   },
 

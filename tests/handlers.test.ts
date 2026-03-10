@@ -247,6 +247,79 @@ describe("prepend_to_note", () => {
   });
 });
 
+// ── str_replace_in_note ───────────────────────────────────────────────────
+
+describe("str_replace_in_note", () => {
+  it("replaces a unique occurrence of old_str with new_str", async () => {
+    mockRead.mockResolvedValueOnce("Hello world, this is a test.");
+    const result = await handleTool("str_replace_in_note", {
+      path: "Notes/Test.md",
+      old_str: "world",
+      new_str: "universe",
+    });
+    expect(mockWrite).toHaveBeenCalledWith(
+      "Notes/Test.md",
+      "Hello universe, this is a test.",
+      { overwrite: true },
+    );
+    expect(result).toBe("Replaced in: Notes/Test.md");
+  });
+
+  it("throws when old_str is not found in the note", async () => {
+    mockRead.mockResolvedValueOnce("Hello world");
+    await expect(
+      handleTool("str_replace_in_note", {
+        path: "Notes/Test.md",
+        old_str: "missing",
+        new_str: "replacement",
+      }),
+    ).rejects.toThrow("not found");
+  });
+
+  it("throws when old_str appears more than once", async () => {
+    mockRead.mockResolvedValueOnce("foo bar foo baz");
+    await expect(
+      handleTool("str_replace_in_note", {
+        path: "Notes/Test.md",
+        old_str: "foo",
+        new_str: "qux",
+      }),
+    ).rejects.toThrow("multiple");
+  });
+
+  it("handles multi-line old_str and new_str", async () => {
+    mockRead.mockResolvedValueOnce("line1\nline2\nline3");
+    const result = await handleTool("str_replace_in_note", {
+      path: "Notes/Test.md",
+      old_str: "line1\nline2",
+      new_str: "replaced1\nreplaced2",
+    });
+    expect(mockWrite).toHaveBeenCalledWith(
+      "Notes/Test.md",
+      "replaced1\nreplaced2\nline3",
+      { overwrite: true },
+    );
+    expect(result).toBe("Replaced in: Notes/Test.md");
+  });
+
+  it("resolves file by name via findFileByName", async () => {
+    mockFindFile.mockResolvedValueOnce("Notes/MyNote.md");
+    mockRead.mockResolvedValueOnce("old content");
+    const result = await handleTool("str_replace_in_note", {
+      file: "MyNote",
+      old_str: "old content",
+      new_str: "new content",
+    });
+    expect(mockFindFile).toHaveBeenCalledWith("MyNote");
+    expect(mockWrite).toHaveBeenCalledWith(
+      "Notes/MyNote.md",
+      "new content",
+      { overwrite: true },
+    );
+    expect(result).toBe("Replaced in: Notes/MyNote.md");
+  });
+});
+
 // ── search_vault ─────────────────────────────────────────────────────────
 
 describe("search_vault", () => {
