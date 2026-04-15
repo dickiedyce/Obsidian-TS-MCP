@@ -31,6 +31,7 @@ const EXPECTED_TOOL_NAMES = [
   "query_base",
   "backlog_add",
   "backlog_read",
+  "backlog_open",
   "backlog_done",
   "project_list",
   "project_overview",
@@ -43,8 +44,8 @@ const EXPECTED_TOOL_NAMES = [
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 38 tools", () => {
-    expect(tools).toHaveLength(38);
+  it("exports exactly 39 tools", () => {
+    expect(tools).toHaveLength(39);
   });
 
   it("has all expected tool names", () => {
@@ -295,10 +296,31 @@ describe("specific schemas", () => {
     expect(schema.required).toContain("project");
   });
 
-  it("backlog_done requires 'project' and 'item'", () => {
+  it("backlog_open requires 'project'", () => {
+    const schema = byName("backlog_open").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+  });
+
+  it("backlog_open exposes optional ensure_ids parameter", () => {
+    const props = byName("backlog_open").inputSchema.properties as Record<
+      string,
+      { type?: string }
+    >;
+    expect(props.ensure_ids.type).toBe("boolean");
+  });
+
+  it("backlog_done requires only 'project'", () => {
     const schema = byName("backlog_done").inputSchema as { required?: string[] };
     expect(schema.required).toContain("project");
-    expect(schema.required).toContain("item");
+    expect(schema.required).not.toContain("item");
+  });
+
+  it("backlog_done exposes optional id parameter", () => {
+    const props = byName("backlog_done").inputSchema.properties as Record<
+      string,
+      { type?: string }
+    >;
+    expect(props.id.type).toBe("number");
   });
 
   it("project_list has no required fields", () => {

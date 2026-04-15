@@ -27,6 +27,17 @@ describe("validateInput", () => {
     expect(() => validateInput("create_note", { name: "My Note" })).not.toThrow();
   });
 
+  it("backlog_done only requires project", () => {
+    expect(() => validateInput("backlog_done", { project: "P" })).not.toThrow();
+  });
+
+  it("backlog_open requires project", () => {
+    expect(() => validateInput("backlog_open", { project: "P" })).not.toThrow();
+    expect(() => validateInput("backlog_open", {})).toThrow(
+      /Missing required parameter "project"/,
+    );
+  });
+
   it("passes for tools with no required fields", () => {
     expect(() => validateInput("daily_note", {})).not.toThrow();
     expect(() => validateInput("list_files", {})).not.toThrow();
@@ -71,6 +82,22 @@ describe("validateInput", () => {
         format: "json",
       }),
     ).not.toThrow();
+  });
+
+  it("validates backlog_done id type", () => {
+    expect(() => validateInput("backlog_done", { project: "P", id: 3 })).not.toThrow();
+    expect(() => validateInput("backlog_done", { project: "P", id: "3" })).toThrow(
+      /must be a number/,
+    );
+  });
+
+  it("validates backlog_open ensure_ids type", () => {
+    expect(() =>
+      validateInput("backlog_open", { project: "P", ensure_ids: true }),
+    ).not.toThrow();
+    expect(() =>
+      validateInput("backlog_open", { project: "P", ensure_ids: "yes" }),
+    ).toThrow(/must be a boolean/);
   });
 
   // ── Enum checking ───────────────────────────────────────────────────

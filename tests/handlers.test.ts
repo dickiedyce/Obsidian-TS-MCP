@@ -11,9 +11,9 @@ vi.mock("../src/fs-ops.js", async (importOriginal) => {
     writeVaultFile: vi.fn().mockResolvedValue(undefined),
     vaultFileExists: vi.fn().mockResolvedValue(false),
     getVaultPath: vi.fn().mockResolvedValue("/mock/vault"),
-    resolveVaultPath: vi.fn().mockImplementation((p: string) =>
-      Promise.resolve(`/mock/vault/${p}`),
-    ),
+    resolveVaultPath: vi
+      .fn()
+      .mockImplementation((p: string) => Promise.resolve(`/mock/vault/${p}`)),
     moveVaultFile: vi.fn().mockResolvedValue(undefined),
     listVaultFiles: vi.fn().mockResolvedValue([]),
     findFileByName: vi.fn().mockResolvedValue(null),
@@ -86,11 +86,9 @@ describe("create_note", () => {
       path: "Projects/Test/overview.md",
       content: "# Test",
     });
-    expect(mockWrite).toHaveBeenCalledWith(
-      "Projects/Test/overview.md",
-      "# Test",
-      { overwrite: undefined },
-    );
+    expect(mockWrite).toHaveBeenCalledWith("Projects/Test/overview.md", "# Test", {
+      overwrite: undefined,
+    });
     expect(result).toBe("Created: Projects/Test/overview.md");
   });
 
@@ -194,11 +192,9 @@ describe("append_to_note", () => {
       path: "Notes/Test.md",
       content: "new line",
     });
-    expect(mockWrite).toHaveBeenCalledWith(
-      "Notes/Test.md",
-      "existing\nnew line",
-      { overwrite: true },
-    );
+    expect(mockWrite).toHaveBeenCalledWith("Notes/Test.md", "existing\nnew line", {
+      overwrite: true,
+    });
     expect(result).toBe("Appended to: Notes/Test.md");
   });
 
@@ -311,11 +307,9 @@ describe("str_replace_in_note", () => {
       new_str: "new content",
     });
     expect(mockFindFile).toHaveBeenCalledWith("MyNote");
-    expect(mockWrite).toHaveBeenCalledWith(
-      "Notes/MyNote.md",
-      "new content",
-      { overwrite: true },
-    );
+    expect(mockWrite).toHaveBeenCalledWith("Notes/MyNote.md", "new content", {
+      overwrite: true,
+    });
     expect(result).toBe("Replaced in: Notes/MyNote.md");
   });
 });
@@ -417,10 +411,7 @@ describe("daily_append", () => {
   it("creates daily note when read fails (new file)", async () => {
     mockRead.mockRejectedValueOnce(new Error("ENOENT"));
     await handleTool("daily_append", { content: "first entry" });
-    expect(mockWrite).toHaveBeenCalledWith(
-      "Daily Notes/2026-01-01.md",
-      "first entry",
-    );
+    expect(mockWrite).toHaveBeenCalledWith("Daily Notes/2026-01-01.md", "first entry");
   });
 });
 
@@ -501,11 +492,7 @@ describe("get_vault_info", () => {
   });
 
   it("returns folder count when info=folders", async () => {
-    mockListFiles.mockResolvedValueOnce([
-      "a.md",
-      "folder1/b.md",
-      "folder2/c.md",
-    ]);
+    mockListFiles.mockResolvedValueOnce(["a.md", "folder1/b.md", "folder2/c.md"]);
     const result = await handleTool("get_vault_info", { info: "folders" });
     expect(result).toBe("2");
   });
@@ -675,9 +662,7 @@ describe("read_property", () => {
 
 describe("remove_property", () => {
   it("removes a property and writes updated content", async () => {
-    mockRead.mockResolvedValueOnce(
-      "---\ntitle: Test\nstatus: active\n---\nbody",
-    );
+    mockRead.mockResolvedValueOnce("---\ntitle: Test\nstatus: active\n---\nbody");
     const result = await handleTool("remove_property", {
       path: "Notes/Test.md",
       name: "status",
@@ -702,9 +687,7 @@ describe("remove_property", () => {
 
 describe("list_properties", () => {
   it("lists properties for a single file", async () => {
-    mockRead.mockResolvedValueOnce(
-      "---\ntitle: Test\nstatus: active\n---\nbody",
-    );
+    mockRead.mockResolvedValueOnce("---\ntitle: Test\nstatus: active\n---\nbody");
     const result = await handleTool("list_properties", {
       path: "Notes/Test.md",
     });
@@ -786,9 +769,9 @@ describe("toggle_task", () => {
   it("throws when the line is not a task checkbox", async () => {
     mockFindFile.mockResolvedValueOnce("Notes/Tasks.md");
     mockRead.mockResolvedValueOnce("Just a plain line");
-    await expect(
-      handleTool("toggle_task", { file: "Tasks", line: 1 }),
-    ).rejects.toThrow("not a task checkbox");
+    await expect(handleTool("toggle_task", { file: "Tasks", line: 1 })).rejects.toThrow(
+      "not a task checkbox",
+    );
   });
 
   it("resolves file and line from ref parameter", async () => {
@@ -803,9 +786,9 @@ describe("toggle_task", () => {
   it("throws when line number is out of range", async () => {
     mockFindFile.mockResolvedValueOnce("Notes/T.md");
     mockRead.mockResolvedValueOnce("- [ ] Only line");
-    await expect(
-      handleTool("toggle_task", { file: "T", line: 99 }),
-    ).rejects.toThrow("out of range");
+    await expect(handleTool("toggle_task", { file: "T", line: 99 })).rejects.toThrow(
+      "out of range",
+    );
   });
 });
 
@@ -813,10 +796,7 @@ describe("toggle_task", () => {
 
 describe("list_templates", () => {
   it("returns template names without .md extension", async () => {
-    mockListFiles.mockResolvedValueOnce([
-      "Templates/daily.md",
-      "Templates/weekly.md",
-    ]);
+    mockListFiles.mockResolvedValueOnce(["Templates/daily.md", "Templates/weekly.md"]);
     const result = await handleTool("list_templates", {});
     expect(result).toBe("daily\nweekly");
   });
@@ -926,9 +906,7 @@ describe("move_file", () => {
 describe("query_base", () => {
   it("parses base file and returns matching notes as JSON", async () => {
     mockListFiles.mockResolvedValueOnce(["Tasks.base"]);
-    mockRead.mockResolvedValueOnce(
-      JSON.stringify({ source: { folder: "Notes" } }),
-    );
+    mockRead.mockResolvedValueOnce(JSON.stringify({ source: { folder: "Notes" } }));
     mockListFiles.mockResolvedValueOnce(["Notes/A.md"]);
     mockRead.mockResolvedValueOnce("---\ntitle: Note A\n---\nbody");
     const result = await handleTool("query_base", { base: "Tasks" });
@@ -952,9 +930,9 @@ describe("query_base", () => {
 
   it("throws when base file is not found", async () => {
     mockListFiles.mockResolvedValueOnce([]);
-    await expect(
-      handleTool("query_base", { base: "nonexistent" }),
-    ).rejects.toThrow("Base not found");
+    await expect(handleTool("query_base", { base: "nonexistent" })).rejects.toThrow(
+      "Base not found",
+    );
   });
 });
 
@@ -969,6 +947,47 @@ describe("backlog_read", () => {
   });
 });
 
+// ── backlog_open ─────────────────────────────────────────────────────────
+
+describe("backlog_open", () => {
+  it("lists only open backlog items in ID-based format", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n\n- [ ] [#1] Open one\n- [x] [#2] Done item\n- [ ] [#3] Open two\n",
+    );
+    const result = await handleTool("backlog_open", { project: "P" });
+    expect(result).toBe("[#1] Open one\n[#3] Open two");
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  it("assigns IDs to open items missing IDs by default", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n\n- [ ] Existing without id\n- [ ] [#4] Existing with id\n",
+    );
+    const result = await handleTool("backlog_open", { project: "P" });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [ ] [#5] Existing without id");
+    expect(result).toContain("[#5] Existing without id");
+    expect(result).toContain("[#4] Existing with id");
+  });
+
+  it("does not backfill IDs when ensure_ids is false", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] Missing id\n- [ ] [#2] Has id\n");
+    const result = await handleTool("backlog_open", {
+      project: "P",
+      ensure_ids: false,
+    });
+    expect(result).toContain("Missing id");
+    expect(result).toContain("[#2] Has id");
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  it("returns (none) when there are no open items", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [x] [#1] Done\n");
+    const result = await handleTool("backlog_open", { project: "P" });
+    expect(result).toBe("(none)");
+  });
+});
+
 // ── backlog_add ──────────────────────────────────────────────────────────
 
 describe("backlog_add", () => {
@@ -979,7 +998,7 @@ describe("backlog_add", () => {
       item: "New task",
     });
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
-    expect(written).toContain("- [ ] New task");
+    expect(written).toContain("- [ ] [#1] New task");
     expect(result).toContain("Added to backlog");
   });
 
@@ -988,7 +1007,7 @@ describe("backlog_add", () => {
     await handleTool("backlog_add", { project: "NewProject", item: "First" });
     const [path, written] = mockWrite.mock.calls[0] as [string, string];
     expect(path).toBe("Projects/NewProject/backlog.md");
-    expect(written).toContain("- [ ] First");
+    expect(written).toContain("- [ ] [#1] First");
   });
 
   it("appends priority tag when priority specified", async () => {
@@ -999,7 +1018,18 @@ describe("backlog_add", () => {
       priority: "high",
     });
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("[#1] Urgent thing");
     expect(written).toContain("@high");
+  });
+
+  it("increments IDs from existing backlog items", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] [#2] Existing\n- [x] [#7] Done\n");
+    await handleTool("backlog_add", {
+      project: "P",
+      item: "Next task",
+    });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [ ] [#8] Next task");
   });
 
   it("skips duplicate items and does not write", async () => {
@@ -1017,15 +1047,36 @@ describe("backlog_add", () => {
 
 describe("backlog_done", () => {
   it("marks the matching item done with a timestamp", async () => {
-    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] Fix the bug\n");
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] [#1] Fix the bug\n");
     const result = await handleTool("backlog_done", {
       project: "P",
       item: "Fix the bug",
     });
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
-    expect(written).toContain("- [x] Fix the bug");
+    expect(written).toContain("- [x] [#1] Fix the bug");
     expect(written).toMatch(/@done \(\d{2}-\d{2}-\d{2} \d{2}:\d{2}\)/);
     expect(result).toContain("Marked done");
+  });
+
+  it("marks an item done by unique ID", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] [#1] First\n- [ ] [#2] Second\n");
+    await handleTool("backlog_done", { project: "P", id: 2 });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [ ] [#1] First");
+    expect(written).toContain("- [x] [#2] Second");
+  });
+
+  it("matches item text case-insensitively", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] [#1] Fix The Bug\n");
+    await handleTool("backlog_done", { project: "P", item: "fix the bug" });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [x] [#1] Fix The Bug");
+  });
+
+  it("throws when neither item nor id is provided", async () => {
+    await expect(handleTool("backlog_done", { project: "P" })).rejects.toThrow(
+      "Provide either",
+    );
   });
 
   it("throws when no unchecked item matches", async () => {
@@ -1154,9 +1205,7 @@ describe("backlog_prioritise", () => {
     });
     expect(result).toContain("position 1");
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
-    const taskLines = written
-      .split("\n")
-      .filter((l) => l.startsWith("- [ ] "));
+    const taskLines = written.split("\n").filter((l) => l.startsWith("- [ ] "));
     expect(taskLines[0]).toContain("Task C");
   });
 
@@ -1176,17 +1225,13 @@ describe("backlog_prioritise", () => {
 
 describe("backlog_reorder", () => {
   it("reorders items to match the provided sequence", async () => {
-    mockRead.mockResolvedValueOnce(
-      "# Backlog\n- [ ] Alpha\n- [ ] Beta\n- [ ] Gamma\n",
-    );
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] Alpha\n- [ ] Beta\n- [ ] Gamma\n");
     const result = await handleTool("backlog_reorder", {
       project: "P",
       items: ["Gamma", "Alpha"],
     });
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
-    const taskLines = written
-      .split("\n")
-      .filter((l) => l.startsWith("- [ ] "));
+    const taskLines = written.split("\n").filter((l) => l.startsWith("- [ ] "));
     expect(taskLines[0]).toContain("Gamma");
     expect(taskLines[1]).toContain("Alpha");
     expect(taskLines[2]).toContain("Beta");
@@ -1265,8 +1310,8 @@ describe("project_dashboard", () => {
 
 describe("unknown tool", () => {
   it("throws for an unrecognised tool name", async () => {
-    await expect(
-      handleTool("not_a_real_tool" as never, {}),
-    ).rejects.toThrow("Unknown tool");
+    await expect(handleTool("not_a_real_tool" as never, {})).rejects.toThrow(
+      "Unknown tool",
+    );
   });
 });

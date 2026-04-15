@@ -35,6 +35,45 @@ import {
 /** Loosely-typed input object received from MCP tool calls. */
 export type ToolInput = Record<string, string | number | boolean | string[] | undefined>;
 
+interface ParsedBacklogTask {
+  checked: boolean;
+  id?: number;
+  text: string;
+}
+
+const BACKLOG_TASK_RE = /^\s*-\s+\[([ xX])\]\s+(?:\[#(\d+)\]\s+)?(.*)$/;
+
+function parseBacklogTask(line: string): ParsedBacklogTask | null {
+  const m = line.match(BACKLOG_TASK_RE);
+  if (!m) return null;
+
+  return {
+    checked: m[1].toLowerCase() === "x",
+    id: m[2] ? Number(m[2]) : undefined,
+    text: m[3] ?? "",
+  };
+}
+
+function nextBacklogId(content: string): number {
+  let maxId = 0;
+  for (const line of content.split("\n")) {
+    const parsed = parseBacklogTask(line);
+    if (parsed?.id && parsed.id > maxId) {
+      maxId = parsed.id;
+    }
+  }
+  return maxId + 1;
+}
+
+function normalizeBacklogText(text: string): string {
+  return text
+    .replace(/@done\s*\([^)]*\)\s*$/i, "")
+    .replace(/@(high|medium|low)\s*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 // ── Private helpers ───────────────────────────────────────────────────────
 
 /**
@@ -111,7 +150,9 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const overwrite = input.overwrite as boolean | undefined;
 
       const targetPath = notePath
-        ? (notePath.endsWith(".md") ? notePath : `${notePath}.md`)
+        ? notePath.endsWith(".md")
+          ? notePath
+          : `${notePath}.md`
         : noteName.includes("/")
           ? `${noteName}.md`
           : undefined;
@@ -193,9 +234,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const format = (input.format as string | undefined) ?? "json";
 
       const isTagQuery = query.startsWith("#");
-      const searchTerm = isTagQuery
-        ? query.slice(1).toLowerCase()
-        : query.toLowerCase();
+      const searchTerm = isTagQuery ? query.slice(1).toLowerCase() : query.toLowerCase();
 
       const files = await listVaultFiles({ folder: pathFilter, ext: "md" });
 
@@ -412,9 +451,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       if (format === "md") {
         return headings.map((h) => `${"#".repeat(h.level)} ${h.text}`).join("\n");
       }
-      return headings
-        .map((h) => `${"  ".repeat(h.level - 1)}- ${h.text}`)
-        .join("\n");
+      return headings.map((h) => `${"  ".repeat(h.level - 1)}- ${h.text}`).join("\n");
     }
 
     // ── Properties / Metadata ─────────────────────────────────────────
@@ -462,7 +499,9 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         filePaths = [await getDailyNotePath()];
       } else if (file) {
         const resolved = file.includes("/")
-          ? (file.endsWith(".md") ? file : `${file}.md`)
+          ? file.endsWith(".md")
+            ? file
+            : `${file}.md`
           : ((await findFileByName(file)) ?? `${file}.md`);
         filePaths = [resolved];
       } else if (pathParam) {
@@ -515,10 +554,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       }
 
       return rows
-        .map(
-          (r) =>
-            `- [${r.checked ? "x" : " "}] ${r.text} (${r.file}:${r.line})`,
-        )
+        .map((r) => `- [${r.checked ? "x" : " "}] ${r.text} (${r.file}:${r.line})`)
         .join("\n");
     }
 
@@ -532,14 +568,18 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         const refFile = ref.slice(0, colon);
         lineNum = Number(ref.slice(colon + 1));
         filePath = refFile.includes("/")
-          ? (refFile.endsWith(".md") ? refFile : `${refFile}.md`)
+          ? refFile.endsWith(".md")
+            ? refFile
+            : `${refFile}.md`
           : ((await findFileByName(refFile)) ??
             (refFile.endsWith(".md") ? refFile : `${refFile}.md`));
       } else {
         const file = input.file as string;
         lineNum = input.line as number;
         filePath = file.includes("/")
-          ? (file.endsWith(".md") ? file : `${file}.md`)
+          ? file.endsWith(".md")
+            ? file
+            : `${file}.md`
           : ((await findFileByName(file)) ??
             (file.endsWith(".md") ? file : `${file}.md`));
       }
@@ -557,9 +597,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       } else if (/^\s*-\s+\[x\]/i.test(lines[idx])) {
         lines[idx] = lines[idx].replace(/^(\s*-\s+)\[x\]/i, "$1[ ]");
       } else {
-        throw new Error(
-          `Line ${lineNum} in ${filePath} is not a task checkbox`,
-        );
+        throw new Error(`Line ${lineNum} in ${filePath} is not a task checkbox`);
       }
 
       await writeVaultFile(filePath, lines.join("\n"), { overwrite: true });
@@ -799,21 +837,21 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         fileExisted = false;
       }
 
-      const normalizedItem = item.toLowerCase().trim();
+      const normalizedItem = normalizeBacklogText(item);
       for (const line of existingContent.split("\n")) {
-        if (line.startsWith("- [ ] ")) {
-          const existingText = line
-            .slice(6)
-            .replace(/@(high|medium|low)\s*$/i, "")
-            .trim()
-            .toLowerCase();
+        const parsed = parseBacklogTask(line);
+        if (parsed && !parsed.checked) {
+          const existingText = normalizeBacklogText(parsed.text);
           if (existingText === normalizedItem) {
             return `Skipped: duplicate item already exists in backlog`;
           }
         }
       }
 
-      const taskLine = priority ? `- [ ] ${item} @${priority}` : `- [ ] ${item}`;
+      const id = nextBacklogId(existingContent);
+      const taskLine = priority
+        ? `- [ ] [#${id}] ${item} @${priority}`
+        : `- [ ] [#${id}] ${item}`;
 
       if (!fileExisted) {
         await writeVaultFile(backlogPath, `# Backlog\n\n${taskLine}\n`);
@@ -829,16 +867,73 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
     case "backlog_read":
       return readVaultFile(`Projects/${input.project as string}/backlog.md`);
 
-    case "backlog_done": {
+    case "backlog_open": {
       const project = input.project as string;
-      const item = input.item as string;
+      const ensureIds = (input.ensure_ids as boolean | undefined) ?? true;
       const backlogPath = `Projects/${project}/backlog.md`;
 
       const content = await readVaultFile(backlogPath);
       const lines = content.split("\n");
-      let found = false;
+      let nextId = nextBacklogId(content);
+      let changed = false;
+
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].startsWith("- [ ] ") && lines[i].includes(item)) {
+        const parsed = parseBacklogTask(lines[i]);
+        if (!parsed || parsed.checked || parsed.id !== undefined || !ensureIds) continue;
+
+        lines[i] = lines[i].replace(/^\s*-\s+\[ \]\s+/, `- [ ] [#${nextId}] `);
+        nextId += 1;
+        changed = true;
+      }
+
+      if (changed) {
+        await writeVaultFile(backlogPath, lines.join("\n"), { overwrite: true });
+      }
+
+      const openLines = lines.filter((line) => {
+        const parsed = parseBacklogTask(line);
+        return parsed !== null && !parsed.checked;
+      });
+
+      if (openLines.length === 0) return "(none)";
+
+      return openLines
+        .map((line) => {
+          const parsed = parseBacklogTask(line);
+          if (!parsed) return line;
+          return parsed.id !== undefined ? `[#${parsed.id}] ${parsed.text}` : parsed.text;
+        })
+        .join("\n");
+    }
+
+    case "backlog_done": {
+      const project = input.project as string;
+      const item = input.item as string | undefined;
+      const id = input.id as number | undefined;
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      if (id === undefined && (!item || item.trim() === "")) {
+        throw new Error('Provide either "id" or "item" to identify a backlog entry');
+      }
+      if (id !== undefined && (!Number.isInteger(id) || id <= 0)) {
+        throw new Error('"id" must be a positive integer');
+      }
+
+      const content = await readVaultFile(backlogPath);
+      const lines = content.split("\n");
+      let found = false;
+      const normalizedNeedle = item ? normalizeBacklogText(item) : undefined;
+      for (let i = 0; i < lines.length; i++) {
+        const parsed = parseBacklogTask(lines[i]);
+        if (!parsed || parsed.checked) continue;
+
+        const textMatch =
+          normalizedNeedle !== undefined &&
+          (normalizeBacklogText(parsed.text).includes(normalizedNeedle) ||
+            lines[i].toLowerCase().includes(normalizedNeedle));
+        const idMatch = id !== undefined && parsed.id === id;
+
+        if (idMatch || textMatch) {
           const now = new Date();
           const yy = String(now.getFullYear()).slice(2);
           const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -846,20 +941,24 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
           const hh = String(now.getHours()).padStart(2, "0");
           const min = String(now.getMinutes()).padStart(2, "0");
           const stamp = `${yy}-${mm}-${dd} ${hh}:${min}`;
-          lines[i] = lines[i].replace("- [ ] ", "- [x] ") + ` @done (${stamp})`;
+          lines[i] =
+            lines[i].replace(/^(\s*-\s+)\[[ xX]\]/, "$1[x]") + ` @done (${stamp})`;
           found = true;
           break;
         }
       }
 
       if (!found) {
-        throw new Error(
-          `No unchecked backlog item matching "${item}" in ${backlogPath}`,
-        );
+        if (id !== undefined) {
+          throw new Error(
+            `No unchecked backlog item matching id #${id} in ${backlogPath}`,
+          );
+        }
+        throw new Error(`No unchecked backlog item matching "${item}" in ${backlogPath}`);
       }
 
       await writeVaultFile(backlogPath, lines.join("\n"), { overwrite: true });
-      return `Marked done: ${item}`;
+      return id !== undefined ? `Marked done: #${id}` : `Marked done: ${item}`;
     }
 
     case "project_list": {
@@ -875,9 +974,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
     }
 
     case "project_overview":
-      return readVaultFile(
-        `Projects/${input.project as string}/overview.md`,
-      );
+      return readVaultFile(`Projects/${input.project as string}/overview.md`);
 
     case "project_create": {
       const project = input.project as string;
@@ -900,10 +997,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const overviewContent = `${fmLines.join("\n")}\n\n# ${project}\n\n${description}\n`;
 
       await writeVaultFile(`Projects/${project}/overview.md`, overviewContent);
-      await writeVaultFile(
-        `Projects/${project}/backlog.md`,
-        `# Backlog -- ${project}\n`,
-      );
+      await writeVaultFile(`Projects/${project}/backlog.md`, `# Backlog -- ${project}\n`);
       return `Created project: ${project}`;
     }
 
@@ -914,17 +1008,11 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const sessionCount = (input.sessions as number | undefined) ?? 3;
       const sections: string[] = [];
 
-      const overview = await readVaultFile(
-        `Projects/${project}/overview.md`,
-      );
+      const overview = await readVaultFile(`Projects/${project}/overview.md`);
       sections.push("## Overview\n\n" + overview);
 
-      const backlog = await readVaultFile(
-        `Projects/${project}/backlog.md`,
-      );
-      const openItems = backlog
-        .split("\n")
-        .filter((l) => l.startsWith("- [ ] "));
+      const backlog = await readVaultFile(`Projects/${project}/backlog.md`);
+      const openItems = backlog.split("\n").filter((l) => l.startsWith("- [ ] "));
       sections.push(
         `## Open Backlog Items (${openItems.length})\n\n` +
           (openItems.length > 0 ? openItems.join("\n") : "(none)"),
@@ -944,9 +1032,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         const sessSections: string[] = [];
         for (const file of sessionFiles) {
           const content = await readVaultFile(file);
-          sessSections.push(
-            `### ${file.split("/").pop()}\n\n${content}`,
-          );
+          sessSections.push(`### ${file.split("/").pop()}\n\n${content}`);
         }
         sections.push(
           `## Recent Sessions (${sessionFiles.length})\n\n` +
@@ -989,15 +1075,9 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         sessions.push(`### ${name}\n\n${content}`);
       }
 
-      const backlog = await readVaultFile(
-        `Projects/${project}/backlog.md`,
-      );
-      const openItems = backlog
-        .split("\n")
-        .filter((l) => l.startsWith("- [ ] "));
-      const doneItems = backlog
-        .split("\n")
-        .filter((l) => l.startsWith("- [x] "));
+      const backlog = await readVaultFile(`Projects/${project}/backlog.md`);
+      const openItems = backlog.split("\n").filter((l) => l.startsWith("- [ ] "));
+      const doneItems = backlog.split("\n").filter((l) => l.startsWith("- [x] "));
 
       return [
         `# Project Summary: ${project}`,
@@ -1022,9 +1102,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
 
       const projectNames = [
         ...new Set(
-          allFiles
-            .map((f) => f.replace(/^Projects\//, "").split("/")[0])
-            .filter(Boolean),
+          allFiles.map((f) => f.replace(/^Projects\//, "").split("/")[0]).filter(Boolean),
         ),
       ];
 
@@ -1038,12 +1116,8 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const projects: ProjectInfo[] = [];
 
       for (const pName of projectNames) {
-        const projectFiles = allFiles.filter((f) =>
-          f.startsWith(`Projects/${pName}/`),
-        );
-        const sessionFiles = projectFiles.filter((f) =>
-          /\d{4}-\d{2}-\d{2}/.test(f),
-        );
+        const projectFiles = allFiles.filter((f) => f.startsWith(`Projects/${pName}/`));
+        const sessionFiles = projectFiles.filter((f) => /\d{4}-\d{2}-\d{2}/.test(f));
         const dates = sessionFiles
           .map((f) => {
             const m = f.match(/(\d{4}-\d{2}-\d{2})/);
@@ -1057,19 +1131,13 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         let openBacklog = 0;
         let status = "unknown";
         try {
-          const backlog = await readVaultFile(
-            `Projects/${pName}/backlog.md`,
-          );
-          openBacklog = backlog
-            .split("\n")
-            .filter((l) => l.startsWith("- [ ] ")).length;
+          const backlog = await readVaultFile(`Projects/${pName}/backlog.md`);
+          openBacklog = backlog.split("\n").filter((l) => l.startsWith("- [ ] ")).length;
         } catch {
           /* no backlog */
         }
         try {
-          const overview = await readVaultFile(
-            `Projects/${pName}/overview.md`,
-          );
+          const overview = await readVaultFile(`Projects/${pName}/overview.md`);
           const m = overview.match(/^status:\s*(.+)$/m);
           if (m) status = m[1].trim();
         } catch {
@@ -1117,9 +1185,7 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
 
       const matchIdx = unchecked.findIndex((t) => t.includes(item));
       if (matchIdx === -1) {
-        throw new Error(
-          `No unchecked backlog item matching "${item}" in ${backlogPath}`,
-        );
+        throw new Error(`No unchecked backlog item matching "${item}" in ${backlogPath}`);
       }
 
       const matched = unchecked.splice(matchIdx, 1)[0];
@@ -1175,11 +1241,9 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       }
 
       const reordered = [...matched, ...remaining, ...checked];
-      await writeVaultFile(
-        backlogPath,
-        [...headingLines, ...reordered].join("\n"),
-        { overwrite: true },
-      );
+      await writeVaultFile(backlogPath, [...headingLines, ...reordered].join("\n"), {
+        overwrite: true,
+      });
 
       const movedCount = matched.length;
       let result = `Reordered ${movedCount} item${movedCount !== 1 ? "s" : ""} to top of backlog`;

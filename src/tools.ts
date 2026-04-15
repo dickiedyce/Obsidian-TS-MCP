@@ -46,7 +46,7 @@ function objectSchema(
  * 10. Project Management -- per-project backlog, overview, and listing.
  */
 /**
- * Complete list of MCP tools exposed by this server (38 tools).
+ * Complete list of MCP tools exposed by this server (39 tools).
  */
 export const tools: Tool[] = [
   // ── Core: Note Management ─────────────────────────────────────────────
@@ -683,16 +683,46 @@ export const tools: Tool[] = [
   },
 
   {
+    name: "backlog_open",
+    description:
+      "List a project's open backlog items in a compact ID-based format. " +
+      "By default, assigns missing IDs to unchecked items before returning " +
+      "results so follow-up operations can target entries reliably.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (used as folder name under Projects/)",
+        },
+        ensure_ids: {
+          type: "boolean",
+          description:
+            "When true (default), assign IDs to unchecked backlog items " +
+            "that do not already have one.",
+        },
+      },
+      ["project"],
+    ),
+  },
+
+  {
     name: "backlog_done",
     description:
-      "Mark a backlog item as done. Finds the first unchecked item whose text " +
-      "contains the given substring and checks it off with a @done timestamp. " +
+      "Mark a backlog item as done. Matches by unique ID when provided, otherwise " +
+      "finds the first unchecked item whose text contains the given substring " +
+      "(case-insensitive), then checks it off with a @done timestamp. " +
       "The item is changed from '- [ ] item' to '- [x] item @done (YY-MM-DD HH:mm)'.",
     inputSchema: objectSchema(
       {
         project: {
           type: "string",
           description: "Project name (used as folder name under Projects/)",
+        },
+        id: {
+          type: "number",
+          description:
+            "Unique backlog item ID (from [#<id>] marker). If provided, takes " +
+            "priority over item text matching.",
         },
         item: {
           type: "string",
@@ -701,7 +731,7 @@ export const tools: Tool[] = [
             "The first matching '- [ ]' line is marked as done.",
         },
       },
-      ["project", "item"],
+      ["project"],
     ),
   },
 
@@ -774,8 +804,7 @@ export const tools: Tool[] = [
         },
         sessions: {
           type: "number",
-          description:
-            "Number of recent session notes to include (default: 3)",
+          description: "Number of recent session notes to include (default: 3)",
         },
       },
       ["project"],
@@ -832,8 +861,7 @@ export const tools: Tool[] = [
         },
         item: {
           type: "string",
-          description:
-            "Substring to match against unchecked backlog items",
+          description: "Substring to match against unchecked backlog items",
         },
         position: {
           type: "number",
@@ -860,8 +888,7 @@ export const tools: Tool[] = [
         items: {
           type: "array",
           items: { type: "string" },
-          description:
-            "Substrings to match (in desired order, first = top of backlog)",
+          description: "Substrings to match (in desired order, first = top of backlog)",
         },
       },
       ["project", "items"],

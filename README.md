@@ -76,26 +76,26 @@ must match exactly what Obsidian shows in the vault switcher.
 
 ### Environment variables
 
-| Variable             | Description                                                         |
-| -------------------- | ------------------------------------------------------------------- |
-| `OBSIDIAN_VAULT`      | Default vault name appended to every CLI call.                     |
+| Variable              | Description                                                                                                                   |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `OBSIDIAN_VAULT`      | Default vault name appended to every CLI call.                                                                                |
 | `OBSIDIAN_VAULT_PATH` | Absolute filesystem path to the vault root. Used by direct filesystem operations; if unset, the path is resolved via the CLI. |
 
 ## Available tools
 
-The server exposes 37 tools organised into eleven groups.
+The server exposes 39 tools organised into eleven groups.
 
 ### Core -- note management
 
-| Tool              | Description                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------- |
+| Tool              | Description                                                                                                       |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `create_note`     | Create a new note, optionally from a template. Supports a `path` parameter for exact placement in subdirectories. |
-| `read_note`       | Read the full markdown contents of a note.                                            |
-| `append_to_note`  | Append content to the end of a note.                                                  |
-| `prepend_to_note` | Prepend content after the frontmatter of a note.                                      |
-| `search_vault`    | Full-text search with Obsidian query syntax.                                          |
-| `daily_note`      | Get or create today's daily note.                                                     |
-| `daily_append`    | Append content to today's daily note.                                                 |
+| `read_note`       | Read the full markdown contents of a note.                                                                        |
+| `append_to_note`  | Append content to the end of a note.                                                                              |
+| `prepend_to_note` | Prepend content after the frontmatter of a note.                                                                  |
+| `search_vault`    | Full-text search with Obsidian query syntax.                                                                      |
+| `daily_note`      | Get or create today's daily note.                                                                                 |
+| `daily_append`    | Append content to today's daily note.                                                                             |
 
 ### Discovery and context
 
@@ -168,19 +168,22 @@ The server exposes 37 tools organised into eleven groups.
 
 ### Project management
 
-| Tool                  | Description                                                       |
-| --------------------- | ----------------------------------------------------------------- |
-| `project_create`      | Create a new project with overview and backlog files.             |
-| `project_list`        | List all projects in the vault.                                   |
-| `project_overview`    | Read a project's overview metadata.                               |
-| `project_context`     | Load full project context: overview, backlog, recent sessions.    |
-| `project_summary`     | Generate a summary of project activity over a date range.         |
-| `project_dashboard`   | Cross-project dashboard with status, activity, and backlog counts.|
-| `backlog_add`         | Add an item to a project's backlog.                               |
-| `backlog_read`        | Read a project's backlog.                                         |
-| `backlog_done`        | Mark a backlog item as done with a timestamp.                     |
-| `backlog_prioritise`  | Reorder a backlog item to a specific position.                    |
-| `backlog_reorder`     | Reorder multiple backlog items in one call.                       |
+| Tool                 | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| `project_create`     | Create a new project with overview and backlog files.              |
+| `project_list`       | List all projects in the vault.                                    |
+| `project_overview`   | Read a project's overview metadata.                                |
+| `project_context`    | Load full project context: overview, backlog, recent sessions.     |
+| `project_summary`    | Generate a summary of project activity over a date range.          |
+| `project_dashboard`  | Cross-project dashboard with status, activity, and backlog counts. |
+| `backlog_add`        | Add an item to a project's backlog.                                |
+| `backlog_read`       | Read a project's backlog.                                          |
+| `backlog_open`       | List open backlog items and backfill missing open-item IDs.        |
+| `backlog_done`       | Mark a backlog item done by unique ID or text, with timestamp.     |
+| `backlog_prioritise` | Reorder a backlog item to a specific position.                     |
+| `backlog_reorder`    | Reorder multiple backlog items in one call.                        |
+
+Backlog entries created by `backlog_add` now include a stable `[#<id>]` marker.
 
 ## Project structure
 
@@ -189,7 +192,7 @@ src/
   cli.ts          -- Low-level Obsidian CLI wrapper (exec, arg building, errors).
   fs-ops.ts       -- Direct filesystem operations (mkdir, read, write) for exact path control.
   tools.ts        -- MCP tool definitions (names, descriptions, JSON schemas).
-  handlers.ts     -- Dispatches tool calls (37 tools) to CLI commands or filesystem ops.
+  handlers.ts     -- Dispatches tool calls (39 tools) to CLI commands or filesystem ops.
   server.ts       -- MCP server entry-point (stdio transport, error handling).
   validation.ts   -- Input validation against tool schemas.
 tests/
