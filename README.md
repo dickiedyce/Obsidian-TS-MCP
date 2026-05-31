@@ -83,7 +83,7 @@ must match exactly what Obsidian shows in the vault switcher.
 
 ## Available tools
 
-The server exposes 39 tools organised into eleven groups.
+The server exposes 41 tools organised into eleven groups.
 
 ### Core -- note management
 
@@ -180,15 +180,19 @@ The server exposes 39 tools organised into eleven groups.
 | `backlog_read`       | Read a project's backlog.                                          |
 | `backlog_open`       | List open backlog items and backfill missing open-item IDs.        |
 | `backlog_done`       | Mark a backlog item done by unique ID or text, with timestamp.     |
-| `backlog_prioritise` | Reorder a backlog item to a specific position.                     |
-| `backlog_reorder`    | Reorder multiple backlog items in one call.                        |
+| `backlog_done_bulk`  | Mark multiple backlog items done in a single call.                 |
+| `backlog_prioritise` | Move a backlog item (by ID or text) to a specific position.        |
+| `backlog_reorder`    | Reorder multiple backlog items (by IDs or text) in one call.       |
+| `backlog_archive`    | Sweep all done items into an `## Archive` section.                 |
 
-Backlog entries created by `backlog_add` now include a stable `[#<id>]` marker.
+Backlog entries created by `backlog_add` include a stable `[#<id>]` marker.
+Prefer matching by ID over substring text matching where possible -- IDs survive
+edits to item text.
 
 ## Project structure
 
 ```
-src/
+src/41
   cli.ts          -- Low-level Obsidian CLI wrapper (exec, arg building, errors).
   fs-ops.ts       -- Direct filesystem operations (mkdir, read, write) for exact path control.
   tools.ts        -- MCP tool definitions (names, descriptions, JSON schemas).

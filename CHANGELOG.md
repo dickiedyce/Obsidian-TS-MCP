@@ -9,33 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `src/fs-ops.ts` -- direct filesystem operations module that bypasses the
-  Obsidian CLI when exact path control is needed (mkdir, read, write).
-- `create_note` now accepts a `path` parameter for placing notes in
-  subdirectories reliably.
-- `OBSIDIAN_VAULT_PATH` environment variable for specifying the vault root
-  without a CLI round-trip.
-- 11 project management tools: `project_create`, `project_list`,
-  `project_overview`, `project_context`, `project_summary`,
-  `project_dashboard`, `backlog_add`, `backlog_read`, `backlog_done`,
-  `backlog_prioritise`, `backlog_reorder`.
-- Server now exposes 37 tools (up from 26).
-- Tests expanded to 345 (up from 238).
-- `tests/fs-ops.test.ts` for filesystem operations.
+- `backlog_archive` tool: sweeps all done (`[x]`) items from the active
+  backlog into an `## Archive` section at the bottom of the file. Safe to
+  call repeatedly -- already-archived items are preserved.
+- `backlog_done_bulk` tool: marks multiple backlog items done in a single
+  call with a shared `@done` timestamp. Supports both ID-based and
+  substring-based matching.
+- ID-based matching for `backlog_prioritise` and `backlog_reorder`: both
+  tools now accept optional `id`/`ids` parameters (matching by `[#<id>]`
+  markers). ID matching is preferred because it survives text edits.
+- Array type validation in `validateInput`: parameters declared as
+  `type: "array"` are now checked at the validation layer.
+- Server now exposes 41 tools (up from 37).
+- Tests expanded to 444 (up from 345).
+- `tests/validation.test.ts` -- new validation tests for array type
+  checking and the updated tool schemas.
 
-### Fixed
+### Changed
 
-- `project_create` now creates `Projects/<name>/` directories and files on
-  disk instead of silently failing (the CLI ignored directory components in
-  the `name` parameter).
-- `create_note` with directory paths (e.g. `Projects/Foo/note`) now writes
-  to the correct location instead of the vault root.
-- `prepend_to_note` and `append_to_note` no longer fuzzy-match when `file`
-  contains directory separators -- slashes in `file` are automatically
-  converted to a `path` parameter for exact matching.
-- Backlog operations (`backlog_add`, `backlog_done`, `backlog_reorder`,
-  `backlog_prioritise`) now use direct filesystem I/O for reliable
-  path-based reads and writes.
+- `backlog_prioritise` now requires only `project` and `position`; `item`
+  is optional alongside the new `id` parameter.
+- `backlog_reorder` now accepts optional `ids` (number array) as an
+  alternative to the `items` (string array) parameter.
 
 ## [0.2.0] - 2026-02-11
 

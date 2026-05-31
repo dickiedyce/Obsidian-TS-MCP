@@ -1,28 +1,28 @@
 # Obsidian-TS-MCP -- Copilot Instructions
 
 This is an MCP server written in TypeScript that wraps the official Obsidian CLI
-(v1.12+). It exposes 37 tools over the Model Context Protocol for AI agents to
+(v1.12+). It exposes 41 tools over the Model Context Protocol for AI agents to
 read, write, search, and manage notes in an Obsidian vault.
 
 ## Project context
 
 - **Language:** TypeScript (ES2022, Node16 module resolution, strict mode).
-- **Build:** `tsc` to `dist/`.  No bundler.
-- **Test framework:** Vitest.  Tests live in `tests/` and mock the CLI layer.
+- **Build:** `tsc` to `dist/`. No bundler.
+- **Test framework:** Vitest. Tests live in `tests/` and mock the CLI layer.
 - **Runtime dependency:** `@modelcontextprotocol/sdk` (reference MCP SDK).
 - **External dependency:** The `obsidian` CLI binary, which requires the
   Obsidian desktop app to be running and a Catalyst licence.
 
 ## Architecture
 
-| Module | Role |
-|---|---|
-| `src/cli.ts` | Low-level CLI wrapper (`runObsidian`, `buildArgs`, `ObsidianCliError`). |
-| `src/fs-ops.ts` | Direct filesystem operations for vault file management, bypassing CLI when exact path control is needed. |
-| `src/tools.ts` | 37 MCP tool definitions (names, descriptions, JSON schemas). |
-| `src/handlers.ts` | Dispatches tool calls to CLI commands or filesystem ops (`handleTool`). |
-| `src/validation.ts` | Input validation against tool schemas (`validateInput`, `ValidationError`). |
-| `src/server.ts` | MCP server entry-point (stdio transport, error formatting). |
+| Module              | Role                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `src/cli.ts`        | Low-level CLI wrapper (`runObsidian`, `buildArgs`, `ObsidianCliError`).                                  |
+| `src/fs-ops.ts`     | Direct filesystem operations for vault file management, bypassing CLI when exact path control is needed. |
+| `src/tools.ts`      | 41 MCP tool definitions (names, descriptions, JSON schemas).                                             |
+| `src/handlers.ts`   | Dispatches tool calls to CLI commands or filesystem ops (`handleTool`).                                  |
+| `src/validation.ts` | Input validation against tool schemas (`validateInput`, `ValidationError`).                              |
+| `src/server.ts`     | MCP server entry-point (stdio transport, error formatting).                                              |
 
 ## Coding conventions
 
@@ -30,7 +30,7 @@ read, write, search, and manage notes in an Obsidian vault.
 - Use JSDoc `@module` headers on every source file.
 - Keep tool definitions in `tools.ts` and handler logic in `handlers.ts`
   strictly separated.
-- Boolean CLI flags are passed as bare names (no `=true`).  String and number
+- Boolean CLI flags are passed as bare names (no `=true`). String and number
   params use `key=value` format.
 - Do not use emojis in code comments, commit messages, or documentation.
 - When adding a new tool: add the definition in `tools.ts`, the handler case
