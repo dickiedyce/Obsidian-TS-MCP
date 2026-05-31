@@ -41,11 +41,13 @@ const EXPECTED_TOOL_NAMES = [
   "project_dashboard",
   "backlog_prioritise",
   "backlog_reorder",
+  "backlog_done_bulk",
+  "backlog_archive",
 ];
 
 describe("tool definitions", () => {
-  it("exports exactly 39 tools", () => {
-    expect(tools).toHaveLength(39);
+  it("exports exactly 41 tools", () => {
+    expect(tools).toHaveLength(41);
   });
 
   it("has all expected tool names", () => {
@@ -364,16 +366,59 @@ describe("specific schemas", () => {
     expect(props.format.enum).toEqual(["json", "md"]);
   });
 
-  it("backlog_prioritise requires 'project', 'item', and 'position'", () => {
+  it("backlog_prioritise requires 'project' and 'position'", () => {
     const schema = byName("backlog_prioritise").inputSchema as { required?: string[] };
     expect(schema.required).toContain("project");
-    expect(schema.required).toContain("item");
     expect(schema.required).toContain("position");
+    expect(schema.required).not.toContain("item");
   });
 
-  it("backlog_reorder requires 'project' and 'items'", () => {
+  it("backlog_prioritise exposes optional id and item parameters", () => {
+    const props = byName("backlog_prioritise").inputSchema.properties as Record<
+      string,
+      { type?: string }
+    >;
+    expect(props.id.type).toBe("number");
+    expect(props.item.type).toBe("string");
+  });
+
+  it("backlog_reorder requires 'project'", () => {
     const schema = byName("backlog_reorder").inputSchema as { required?: string[] };
     expect(schema.required).toContain("project");
-    expect(schema.required).toContain("items");
+    expect(schema.required).not.toContain("items");
+  });
+
+  it("backlog_reorder exposes optional ids and items parameters", () => {
+    const props = byName("backlog_reorder").inputSchema.properties as Record<
+      string,
+      { type?: string; items?: { type: string } }
+    >;
+    expect(props.ids.type).toBe("array");
+    expect(props.ids.items.type).toBe("number");
+    expect(props.items.type).toBe("array");
+    expect(props.items.items.type).toBe("string");
+  });
+
+  it("backlog_done_bulk requires 'project'", () => {
+    const schema = byName("backlog_done_bulk").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
+    expect(schema.required).not.toContain("ids");
+    expect(schema.required).not.toContain("items");
+  });
+
+  it("backlog_done_bulk exposes optional ids (number array) and items (string array)", () => {
+    const props = byName("backlog_done_bulk").inputSchema.properties as Record<
+      string,
+      { type?: string; items?: { type: string } }
+    >;
+    expect(props.ids.type).toBe("array");
+    expect(props.ids.items.type).toBe("number");
+    expect(props.items.type).toBe("array");
+    expect(props.items.items.type).toBe("string");
+  });
+
+  it("backlog_archive requires 'project'", () => {
+    const schema = byName("backlog_archive").inputSchema as { required?: string[] };
+    expect(schema.required).toContain("project");
   });
 });

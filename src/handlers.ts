@@ -1173,37 +1173,69 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
 
     case "backlog_prioritise": {
       const project = input.project as string;
-      const item = input.item as string;
+      const id = input.id as number | undefined;
+      const item = input.item as string | undefined;
       const position = input.position as number;
       const backlogPath = `Projects/${project}/backlog.md`;
 
+      if (id === undefined && (!item || item.trim() === "")) {
+        throw new Error('Provide either "id" or "item" to identify a backlog entry');
+      }
+      if (id !== undefined && (!Number.isInteger(id) || id <= 0)) {
+        throw new Error('"id" must be a positive integer');
+      }
+
       const content = await readVaultFile(backlogPath);
-      const unchecked: string[] = [];
+      const unchecked: { line: string; raw: string }[] = [];
       for (const line of content.split("\n")) {
-        if (line.startsWith("- [ ] ")) unchecked.push(line.slice(6));
+        if (line.startsWith("- [ ] ")) {
+          unchecked.push({ line: line.slice(6), raw: line });
+        }
       }
 
-      const matchIdx = unchecked.findIndex((t) => t.includes(item));
-      if (matchIdx === -1) {
-        throw new Error(`No unchecked backlog item matching "${item}" in ${backlogPath}`);
+      let matchIdx: number;
+      let matchedLabel: string;
+
+      if (id !== undefined) {
+        matchIdx = unchecked.findIndex((t) => {
+          const parsed = parseBacklogTask(t.raw);
+          return parsed?.id === id;
+        });
+        if (matchIdx === -1) {
+          throw new Error(`No unchecked backlog item with id #${id} in ${backlogPath}`);
+        }
+        matchedLabel = `#${id}`;
+      } else {
+        matchIdx = unchecked.findIndex((t) => t.line.includes(item!));
+        if (matchIdx === -1) {
+          throw new Error(
+            `No unchecked backlog item matching "${item}" in ${backlogPath}`,
+          );
+        }
+        matchedLabel = `"${item}"`;
       }
 
-      const matched = unchecked.splice(matchIdx, 1)[0];
+      const matched = unchecked.splice(matchIdx, 1)[0].line;
       const targetPos = Math.min(Math.max(1, position), unchecked.length + 1);
       const items = [
-        ...unchecked.slice(0, targetPos - 1),
+        ...unchecked.slice(0, targetPos - 1).map((u) => u.line),
         matched,
-        ...unchecked.slice(targetPos - 1),
+        ...unchecked.slice(targetPos - 1).map((u) => u.line),
       ];
 
       await handleTool("backlog_reorder", { project, items });
-      return `Moved "${item}" to position ${targetPos}`;
+      return `Moved ${matchedLabel} to position ${targetPos}`;
     }
 
     case "backlog_reorder": {
       const project = input.project as string;
-      const items = input.items as unknown as string[];
+      const ids = input.ids as number[] | undefined;
+      const items = input.items as string[] | undefined;
       const backlogPath = `Projects/${project}/backlog.md`;
+
+      if (!ids && !items) {
+        throw new Error('Provide either "ids" or "items" to specify reorder targets');
+      }
 
       const content = await readVaultFile(backlogPath);
       const lines = content.split("\n");
@@ -1231,12 +1263,26 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
       const remaining = [...unchecked];
       const notFound: string[] = [];
 
-      for (const substr of items) {
-        const idx = remaining.findIndex((t) => t.includes(substr));
-        if (idx !== -1) {
-          matched.push(remaining.splice(idx, 1)[0]);
-        } else {
-          notFound.push(substr);
+      if (ids) {
+        for (const targetId of ids) {
+          const idx = remaining.findIndex((t) => {
+            const parsed = parseBacklogTask(t);
+            return parsed?.id === targetId;
+          });
+          if (idx !== -1) {
+            matched.push(remaining.splice(idx, 1)[0]);
+          } else {
+            notFound.push(`#${targetId}`);
+          }
+        }
+      } else if (items) {
+        for (const substr of items) {
+          const idx = remaining.findIndex((t) => t.includes(substr));
+          if (idx !== -1) {
+            matched.push(remaining.splice(idx, 1)[0]);
+          } else {
+            notFound.push(substr);
+          }
         }
       }
 
@@ -1251,6 +1297,140 @@ export async function handleTool(name: string, input: ToolInput): Promise<string
         result += ` (not found: ${notFound.join(", ")})`;
       }
       return result;
+    }
+
+    case "backlog_done_bulk": {
+      const project = input.project as string;
+      const ids = input.ids as number[] | undefined;
+      const items = input.items as string[] | undefined;
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      if (!ids && !items) {
+        throw new Error('Provide either "ids" or "items" to identify entries');
+      }
+      if (ids && (!Array.isArray(ids) || ids.length === 0)) {
+        throw new Error('"ids" must be a non-empty array of positive integers');
+      }
+      if (items && (!Array.isArray(items) || items.length === 0)) {
+        throw new Error('"items" must be a non-empty array of strings');
+      }
+
+      const content = await readVaultFile(backlogPath);
+      const lines = content.split("\n");
+
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(2);
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const dd = String(now.getDate()).padStart(2, "0");
+      const hh = String(now.getHours()).padStart(2, "0");
+      const min = String(now.getMinutes()).padStart(2, "0");
+      const stamp = `${yy}-${mm}-${dd} ${hh}:${min}`;
+
+      let marked = 0;
+      const matchedIds = new Set<number>();
+
+      if (ids) {
+        for (const targetId of ids) {
+          for (let i = 0; i < lines.length; i++) {
+            const parsed = parseBacklogTask(lines[i]);
+            if (!parsed || parsed.checked) continue;
+            if (parsed.id === targetId && !matchedIds.has(targetId)) {
+              lines[i] =
+                lines[i].replace(/^(\s*-\s+)\[[ xX]\]/, "$1[x]") + ` @done (${stamp})`;
+              matchedIds.add(targetId);
+              marked++;
+              break;
+            }
+          }
+        }
+      } else if (items) {
+        for (const substr of items) {
+          const normalizedNeedle = normalizeBacklogText(substr);
+          for (let i = 0; i < lines.length; i++) {
+            const parsed = parseBacklogTask(lines[i]);
+            if (!parsed || parsed.checked) continue;
+            if (
+              normalizeBacklogText(parsed.text).includes(normalizedNeedle) ||
+              lines[i].toLowerCase().includes(normalizedNeedle)
+            ) {
+              const lineId = parsed.id?.toString();
+              const dedupKey = lineId ?? `__text__${i}`;
+              if (matchedIds.has(i)) continue; // crude dedup for text matching
+              lines[i] =
+                lines[i].replace(/^(\s*-\s+)\[[ xX]\]/, "$1[x]") + ` @done (${stamp})`;
+              matchedIds.add(i);
+              marked++;
+              break;
+            }
+          }
+        }
+      }
+
+      await writeVaultFile(backlogPath, lines.join("\n"), { overwrite: true });
+
+      const total = ids ? ids.length : items!.length;
+      return `Marked ${marked} of ${total} item${total !== 1 ? "s" : ""} done`;
+    }
+
+    case "backlog_archive": {
+      const project = input.project as string;
+      const backlogPath = `Projects/${project}/backlog.md`;
+
+      const content = await readVaultFile(backlogPath);
+      const lines = content.split("\n");
+
+      // Separate the file into sections:
+      //   headerLines: everything before the archive section heading
+      //   archiveLines: existing archive section (if any)
+      const headerLines: string[] = [];
+      const archiveLines: string[] = [];
+      let inArchive = false;
+
+      for (const line of lines) {
+        if (/^##\s+Archive/i.test(line)) {
+          inArchive = true;
+          archiveLines.push(line);
+        } else if (inArchive) {
+          archiveLines.push(line);
+        } else {
+          headerLines.push(line);
+        }
+      }
+
+      // Collect done items from headerLines, leaving the rest
+      const activeLines: string[] = [];
+      const doneLines: string[] = [];
+
+      for (const line of headerLines) {
+        const parsed = parseBacklogTask(line);
+        if (parsed && parsed.checked) {
+          doneLines.push(line);
+        } else {
+          activeLines.push(line);
+        }
+      }
+
+      const archivedCount = doneLines.length;
+
+      if (archivedCount === 0) {
+        return "Archived 0 items (no done items to sweep)";
+      }
+
+      // Build the output: active section + trailing blank + archive section
+      const outLines = [...activeLines];
+      // Ensure a blank line before the archive heading if not already blank
+      if (outLines.length > 0 && outLines[outLines.length - 1] !== "") {
+        outLines.push("");
+      }
+      outLines.push("## Archive");
+      outLines.push("");
+      // Merge existing archive content (skip the heading line since we added it above)
+      const existingArchiveBody = archiveLines.slice(1);
+      outLines.push(...doneLines, ...existingArchiveBody);
+
+      await writeVaultFile(backlogPath, outLines.join("\n"), { overwrite: true });
+
+      return `Archived ${archivedCount} item${archivedCount !== 1 ? "s" : ""} to ## Archive`;
     }
 
     default:

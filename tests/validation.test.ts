@@ -100,6 +100,33 @@ describe("validateInput", () => {
     ).toThrow(/must be a boolean/);
   });
 
+  it("validates backlog_prioritise id type", () => {
+    expect(() =>
+      validateInput("backlog_prioritise", { project: "P", id: 3, position: 1 }),
+    ).not.toThrow();
+    expect(() =>
+      validateInput("backlog_prioritise", { project: "P", id: "3", position: 1 }),
+    ).toThrow(/must be a number/);
+  });
+
+  it("validates backlog_reorder ids array type", () => {
+    expect(() =>
+      validateInput("backlog_reorder", { project: "P", ids: [1, 2] }),
+    ).not.toThrow();
+    expect(() => validateInput("backlog_reorder", { project: "P", ids: "1,2" })).toThrow(
+      /must be an array/,
+    );
+  });
+
+  it("validates backlog_done_bulk ids array type", () => {
+    expect(() =>
+      validateInput("backlog_done_bulk", { project: "P", ids: [1, 2] }),
+    ).not.toThrow();
+    expect(() =>
+      validateInput("backlog_done_bulk", { project: "P", ids: "1,2" }),
+    ).toThrow(/must be an array/);
+  });
+
   // ── Enum checking ───────────────────────────────────────────────────
 
   it("rejects invalid enum value", () => {

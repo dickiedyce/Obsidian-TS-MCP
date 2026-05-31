@@ -1194,19 +1194,44 @@ describe("project_context", () => {
 // ── backlog_prioritise ───────────────────────────────────────────────────
 
 describe("backlog_prioritise", () => {
-  it("moves item to the specified position", async () => {
+  it("moves item by substring to the specified position", async () => {
     const content = "# Backlog\n- [ ] Task A\n- [ ] Task B\n- [ ] Task C\n";
     mockRead.mockResolvedValueOnce(content);
+    // reorder reads + writes
     mockRead.mockResolvedValueOnce(content);
     const result = await handleTool("backlog_prioritise", {
       project: "P",
       item: "Task C",
       position: 1,
     });
+    expect(result).toContain('Moved "Task C"');
     expect(result).toContain("position 1");
     const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
     const taskLines = written.split("\n").filter((l) => l.startsWith("- [ ] "));
     expect(taskLines[0]).toContain("Task C");
+  });
+
+  it("moves item by ID to the specified position (preferred path)", async () => {
+    const content = "# Backlog\n- [ ] [#1] Alpha\n- [ ] [#2] Beta\n- [ ] [#3] Gamma\n";
+    mockRead.mockResolvedValueOnce(content);
+    mockRead.mockResolvedValueOnce(content);
+    const result = await handleTool("backlog_prioritise", {
+      project: "P",
+      id: 3,
+      position: 1,
+    });
+    expect(result).toContain("Moved #3");
+    expect(result).toContain("position 1");
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    const taskLines = written.split("\n").filter((l) => l.startsWith("- [ ] "));
+    expect(taskLines[0]).toContain("Gamma");
+  });
+
+  it("throws when neither id nor item is provided", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] Only task\n");
+    await expect(
+      handleTool("backlog_prioritise", { project: "P", position: 1 }),
+    ).rejects.toThrow("Provide either");
   });
 
   it("throws when item is not found in backlog", async () => {
@@ -1219,12 +1244,19 @@ describe("backlog_prioritise", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("throws when id is not found in backlog", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] [#1] Only task\n");
+    await expect(
+      handleTool("backlog_prioritise", { project: "P", id: 99, position: 1 }),
+    ).rejects.toThrow("id #99");
+  });
 });
 
 // ── backlog_reorder ──────────────────────────────────────────────────────
 
 describe("backlog_reorder", () => {
-  it("reorders items to match the provided sequence", async () => {
+  it("reorders items by substring to match the provided sequence", async () => {
     mockRead.mockResolvedValueOnce("# Backlog\n- [ ] Alpha\n- [ ] Beta\n- [ ] Gamma\n");
     const result = await handleTool("backlog_reorder", {
       project: "P",
@@ -1238,13 +1270,177 @@ describe("backlog_reorder", () => {
     expect(result).toContain("Reordered 2 items");
   });
 
-  it("reports items not found in the backlog", async () => {
+  it("reorders items by ID (preferred path)", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n- [ ] [#1] Alpha\n- [ ] [#2] Beta\n- [ ] [#3] Gamma\n",
+    );
+    const result = await handleTool("backlog_reorder", {
+      project: "P",
+      ids: [3, 1],
+    });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    const taskLines = written.split("\n").filter((l) => l.startsWith("- [ ] "));
+    expect(taskLines[0]).toContain("[#3] Gamma");
+    expect(taskLines[1]).toContain("[#1] Alpha");
+    expect(taskLines[2]).toContain("[#2] Beta");
+    expect(result).toContain("Reordered 2 items");
+  });
+
+  it("reports IDs not found in the backlog", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] [#1] Existing\n");
+    const result = await handleTool("backlog_reorder", {
+      project: "P",
+      ids: [99],
+    });
+    expect(result).toContain("not found");
+    expect(result).toContain("#99");
+  });
+
+  it("reports substrings not found in the backlog", async () => {
     mockRead.mockResolvedValueOnce("# Backlog\n- [ ] Existing\n");
     const result = await handleTool("backlog_reorder", {
       project: "P",
       items: ["Missing"],
     });
     expect(result).toContain("not found");
+  });
+
+  it("throws when neither ids nor items are provided", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] Existing\n");
+    await expect(handleTool("backlog_reorder", { project: "P" })).rejects.toThrow(
+      "Provide either",
+    );
+  });
+});
+
+// ── backlog_done_bulk ────────────────────────────────────────────────────
+
+describe("backlog_done_bulk", () => {
+  it("marks multiple items done by ID", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n- [ ] [#1] First\n- [ ] [#2] Second\n- [ ] [#3] Third\n",
+    );
+    const result = await handleTool("backlog_done_bulk", {
+      project: "P",
+      ids: [1, 3],
+    });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [x] [#1] First");
+    expect(written).toContain("- [ ] [#2] Second");
+    expect(written).toContain("- [x] [#3] Third");
+    expect(written).toMatch(/@done \(\d{2}-\d{2}-\d{2} \d{2}:\d{2}\)/);
+    expect(result).toContain("Marked 2 of 2 items done");
+  });
+
+  it("marks multiple items done by substring", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n- [ ] Fix bug\n- [ ] Add feature\n- [ ] Refactor\n",
+    );
+    const result = await handleTool("backlog_done_bulk", {
+      project: "P",
+      items: ["Fix bug", "Refactor"],
+    });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [x] Fix bug");
+    expect(written).toContain("- [ ] Add feature");
+    expect(written).toContain("- [x] Refactor");
+    expect(result).toContain("Marked 2 of 2 items done");
+  });
+
+  it("reports partial success when some IDs are not found", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [ ] [#1] Only\n");
+    const result = await handleTool("backlog_done_bulk", {
+      project: "P",
+      ids: [1, 99],
+    });
+    expect(result).toContain("Marked 1 of 2 items done");
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    expect(written).toContain("- [x] [#1] Only");
+  });
+
+  it("skips already-checked items", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n- [x] [#1] Done\n- [ ] [#2] Open\n");
+    const result = await handleTool("backlog_done_bulk", {
+      project: "P",
+      ids: [1, 2],
+    });
+    expect(result).toContain("Marked 1 of 2 items done");
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+    // #1 stays checked, #2 gets checked
+    expect(written).toContain("- [x] [#1] Done");
+    expect(written).toContain("- [x] [#2] Open");
+  });
+
+  it("throws when neither ids nor items are provided", async () => {
+    await expect(handleTool("backlog_done_bulk", { project: "P" })).rejects.toThrow(
+      "Provide either",
+    );
+  });
+
+  it("throws when ids array is empty", async () => {
+    await expect(
+      handleTool("backlog_done_bulk", { project: "P", ids: [] }),
+    ).rejects.toThrow("non-empty array");
+  });
+
+  it("throws when items array is empty", async () => {
+    await expect(
+      handleTool("backlog_done_bulk", { project: "P", items: [] }),
+    ).rejects.toThrow("non-empty array");
+  });
+});
+
+// ── backlog_archive ──────────────────────────────────────────────────────
+
+describe("backlog_archive", () => {
+  it("sweeps done items into an ## Archive section", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n\n- [ ] [#1] Open\n- [x] [#2] Done one\n- [ ] [#3] Also open\n- [x] [#4] Done two\n",
+    );
+    const result = await handleTool("backlog_archive", { project: "P" });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+
+    expect(written).toContain("- [ ] [#1] Open");
+    expect(written).toContain("- [ ] [#3] Also open");
+    expect(written).toContain("## Archive");
+    expect(written).toContain("- [x] [#2] Done one");
+    expect(written).toContain("- [x] [#4] Done two");
+    // Archive section comes after the active items
+    const archiveIdx = (written as string).indexOf("## Archive");
+    const openIdx = (written as string).indexOf("- [ ] [#1] Open");
+    expect(openIdx).toBeLessThan(archiveIdx);
+    expect(result).toContain("Archived 2 items");
+  });
+
+  it("returns zero-count message when no done items exist", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n\n- [ ] [#1] Only open\n");
+    const result = await handleTool("backlog_archive", { project: "P" });
+    expect(result).toContain("Archived 0 items");
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  it("preserves existing archive content", async () => {
+    mockRead.mockResolvedValueOnce(
+      "# Backlog\n\n- [ ] [#1] Open\n- [x] [#2] New done\n\n## Archive\n\n- [x] [#3] Old done\n",
+    );
+    const result = await handleTool("backlog_archive", { project: "P" });
+    const [, written] = mockWrite.mock.calls[0] as [string, string, unknown];
+
+    // New done item moved to archive
+    expect(written).toContain("- [x] [#2] New done");
+    // Old archive item preserved
+    expect(written).toContain("- [x] [#3] Old done");
+    // Archive heading appears only once
+    const archiveMatches = (written as string).match(/^## Archive$/gm);
+    expect(archiveMatches?.length).toBe(1);
+    expect(result).toContain("Archived 1 item");
+  });
+
+  it("handles an empty backlog gracefully", async () => {
+    mockRead.mockResolvedValueOnce("# Backlog\n");
+    const result = await handleTool("backlog_archive", { project: "P" });
+    expect(result).toContain("Archived 0 items");
+    expect(mockWrite).not.toHaveBeenCalled();
   });
 });
 

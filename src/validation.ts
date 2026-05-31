@@ -122,6 +122,12 @@ export function validateInput(toolName: string, input: Record<string, unknown>):
           `Parameter "${key}" must be a boolean, got ${actualType}`,
         );
       }
+      if (expectedType === "array" && !Array.isArray(value)) {
+        throw new ValidationError(
+          toolName,
+          `Parameter "${key}" must be an array, got ${actualType}`,
+        );
+      }
     }
 
     // Enum check

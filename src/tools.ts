@@ -851,24 +851,33 @@ export const tools: Tool[] = [
     name: "backlog_prioritise",
     description:
       "Reorder a project's backlog by moving an item to a specific position. " +
-      "Position 1 is the top of the backlog. The item is identified by a " +
-      "substring match against unchecked items.",
+      "Position 1 is the top of the backlog. Prefer matching by unique `id` " +
+      "(from [#<id>] markers) over `item` substring matching — IDs survive " +
+      "text edits. Provide exactly one of `id` or `item`.",
     inputSchema: objectSchema(
       {
         project: {
           type: "string",
           description: "Project name (folder name under Projects/)",
         },
+        id: {
+          type: "number",
+          description:
+            "Unique backlog item ID (from [#<id>] marker). Preferred over " +
+            "text matching — survives edits to item text.",
+        },
         item: {
           type: "string",
-          description: "Substring to match against unchecked backlog items",
+          description:
+            "Fallback: substring to match against unchecked backlog items. " +
+            "Fragile if item text changes. Use `id` when possible.",
         },
         position: {
           type: "number",
           description: "Target position (1-based, 1 = top of backlog)",
         },
       },
-      ["project", "item", "position"],
+      ["project", "position"],
     ),
   },
 
@@ -876,22 +885,80 @@ export const tools: Tool[] = [
     name: "backlog_reorder",
     description:
       "Bulk-reorder a project's backlog by providing items in desired order. " +
-      "Items are matched by substring against unchecked tasks. Matched items " +
-      "are moved to the top in the given order; unmatched items retain their " +
-      "relative position below.",
+      "Prefer matching by unique `ids` (from [#<id>] markers) over `items` " +
+      "substring matching — IDs survive text edits. Matched items are moved " +
+      "to the top in the given order; unmatched items retain their relative " +
+      "position below.",
     inputSchema: objectSchema(
       {
         project: {
           type: "string",
           description: "Project name (folder name under Projects/)",
         },
+        ids: {
+          type: "array",
+          items: { type: "number" },
+          description:
+            "Preferred: unique backlog item IDs (from [#<id>] markers) in " +
+            "desired order. Survives text edits.",
+        },
         items: {
           type: "array",
           items: { type: "string" },
-          description: "Substrings to match (in desired order, first = top of backlog)",
+          description:
+            "Fallback: substrings to match (in desired order). Fragile if " +
+            "item text changes. Use `ids` when possible.",
         },
       },
-      ["project", "items"],
+      ["project"],
+    ),
+  },
+
+  {
+    name: "backlog_done_bulk",
+    description:
+      "Mark multiple backlog items as done in a single call. Provide either " +
+      "`ids` (preferred — matches by [#<id>] markers) or `items` (substring " +
+      "match against unchecked items). Returns the count of items marked done.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+        ids: {
+          type: "array",
+          items: { type: "number" },
+          description: "Preferred: unique backlog item IDs (from [#<id>] markers).",
+        },
+        items: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Fallback: substrings to match against unchecked items. " +
+            "Use `ids` when possible.",
+        },
+      },
+      ["project"],
+    ),
+  },
+
+  {
+    name: "backlog_archive",
+    description:
+      "Sweep all done items from the active backlog into an '## Archive' " +
+      "section at the bottom of the file. Keeps the active backlog clean " +
+      "by moving checked-off items out of the way. Returns the number of " +
+      "items archived. Safe to call repeatedly — already-archived items " +
+      "stay in the archive section.",
+    inputSchema: objectSchema(
+      {
+        project: {
+          type: "string",
+          description: "Project name (folder name under Projects/)",
+        },
+      },
+      ["project"],
     ),
   },
 ];
